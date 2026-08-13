@@ -1,0 +1,155 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Utility portal account",
+        "description": "Sign in with the account you use on the web portal of your utility. The login form is detected automatically; only fill in the advanced fields if that fails.",
+        "data": {
+          "base_url": "Portal address",
+          "username": "Username",
+          "password": "Password",
+          "login_url": "Login page (optional)",
+          "username_field": "Username form field (optional)",
+          "password_field": "Password form field (optional)"
+        },
+        "data_description": {
+          "base_url": "For customers of Regio Energie Solothurn: https://okp.regioenergie.ch",
+          "username": "On okp.regioenergie.ch this is the e-mail address you sign in with.",
+          "login_url": "Full address of the login page, if it is not found automatically.",
+          "username_field": "Name of the username input in the login form.",
+          "password_field": "Name of the password input in the login form."
+        }
+      },
+      "meter": {
+        "title": "Add meter",
+        "description": "Enter the first meter. Further meters can be added later under the integration options.",
+        "data": {
+          "name": "Name",
+          "meter_type": "Type",
+          "meter_number": "Meter number",
+          "unit": "Unit",
+          "obis_code": "OBIS code",
+          "export_type": "Export type"
+        },
+        "data_description": {
+          "name": "Used for the statistic name, e.g. Electricity or Water.",
+          "meter_number": "The meter number shown in the portal, e.g. CH1007201234500000000000000014185.",
+          "unit": "Must match the unit the portal exports.",
+          "obis_code": "Leave at 1-1:1.29.0 unless the portal uses a different code.",
+          "export_type": "Leave at WirkBezug unless the portal uses a different one."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in again",
+        "description": "The portal rejected the stored credentials for {username}.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "The portal could not be reached.",
+      "invalid_auth": "The portal rejected these credentials, or the login form could not be found. Fill in the advanced login fields to point the integration at the right form.",
+      "no_data": "The portal returned no readings for this meter. Check the meter number, the OBIS code and the export type.",
+      "required": "This field is required.",
+      "invalid_unit": "This unit does not fit the selected meter type.",
+      "unknown": "Unexpected error. Check the Home Assistant log for details."
+    },
+    "abort": {
+      "already_configured": "This account is already set up.",
+      "reauth_successful": "Signed in again successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Regio Energie Smart Meter Import",
+        "menu_options": {
+          "add_meter": "Add meter",
+          "edit_meter": "Edit meter",
+          "remove_meter": "Remove meter",
+          "settings": "Polling and login settings"
+        }
+      },
+      "add_meter": {
+        "title": "Add meter",
+        "data": {
+          "name": "Name",
+          "meter_type": "Type",
+          "meter_number": "Meter number",
+          "unit": "Unit",
+          "obis_code": "OBIS code",
+          "export_type": "Export type"
+        },
+        "data_description": {
+          "name": "Used for the statistic name, e.g. Electricity or Water.",
+          "meter_number": "The meter number shown in the portal.",
+          "unit": "Must match the unit the portal exports.",
+          "obis_code": "Leave at 1-1:1.29.0 unless the portal uses a different code.",
+          "export_type": "Leave at WirkBezug unless the portal uses a different one."
+        }
+      },
+      "edit_meter": {
+        "title": "Edit meter",
+        "data": {
+          "statistic_id": "Meter"
+        }
+      },
+      "meter_details": {
+        "title": "Edit meter",
+        "description": "Changing the name does not move the collected history: the statistic stays {statistic_id}.",
+        "data": {
+          "name": "Name",
+          "meter_type": "Type",
+          "meter_number": "Meter number",
+          "unit": "Unit",
+          "obis_code": "OBIS code",
+          "export_type": "Export type"
+        }
+      },
+      "remove_meter": {
+        "title": "Remove meter",
+        "description": "Removed meters are no longer polled. Their statistics stay in Home Assistant and can be deleted under Developer tools > Statistics.",
+        "data": {
+          "meters": "Meters to remove"
+        }
+      },
+      "settings": {
+        "title": "Polling and login settings",
+        "data": {
+          "days_to_fetch": "Days per poll",
+          "scan_interval_hours": "Poll interval (hours)",
+          "login_url": "Login page (optional)",
+          "username_field": "Username form field (optional)",
+          "password_field": "Password form field (optional)"
+        },
+        "data_description": {
+          "days_to_fetch": "How far back each poll reads. The overlap picks up values the utility corrects afterwards.",
+          "scan_interval_hours": "The portal usually publishes new data once a day.",
+          "login_url": "Full address of the login page, if it is not found automatically.",
+          "username_field": "Name of the username input in the login form.",
+          "password_field": "Name of the password input in the login form."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "The portal could not be reached.",
+      "invalid_auth": "The portal rejected the stored credentials, or the login form could not be found.",
+      "no_data": "The portal returned no readings for this meter. Check the meter number, the OBIS code and the export type.",
+      "required": "This field is required.",
+      "invalid_unit": "This unit does not fit the selected meter type.",
+      "unknown": "Unexpected error. Check the Home Assistant log for details."
+    }
+  },
+  "selector": {
+    "meter_type": {
+      "options": {
+        "electricity": "Electricity",
+        "gas": "Gas",
+        "water": "Water",
+        "heat": "District heating"
+      }
+    }
+  }
+}

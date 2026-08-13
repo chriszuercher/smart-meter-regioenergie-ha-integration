@@ -1,0 +1,155 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Kundenportal-Konto",
+        "description": "Melde dich mit dem Konto an, das du im Webportal deines Energieversorgers nutzt. Das Login-Formular wird automatisch erkannt; die erweiterten Felder brauchst du nur, wenn das fehlschlägt.",
+        "data": {
+          "base_url": "Portal-Adresse",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "login_url": "Login-Seite (optional)",
+          "username_field": "Formularfeld Benutzername (optional)",
+          "password_field": "Formularfeld Passwort (optional)"
+        },
+        "data_description": {
+          "base_url": "Für Kunden der Regio Energie Solothurn: https://okp.regioenergie.ch",
+          "username": "Auf okp.regioenergie.ch ist das die E-Mail-Adresse, mit der du dich anmeldest.",
+          "login_url": "Vollständige Adresse der Login-Seite, falls sie nicht automatisch gefunden wird.",
+          "username_field": "Name des Benutzername-Felds im Login-Formular.",
+          "password_field": "Name des Passwort-Felds im Login-Formular."
+        }
+      },
+      "meter": {
+        "title": "Zähler hinzufügen",
+        "description": "Trage den ersten Zähler ein. Weitere Zähler kannst du später in den Optionen der Integration ergänzen.",
+        "data": {
+          "name": "Name",
+          "meter_type": "Typ",
+          "meter_number": "Zählernummer",
+          "unit": "Einheit",
+          "obis_code": "OBIS-Code",
+          "export_type": "Export-Typ"
+        },
+        "data_description": {
+          "name": "Wird als Name der Statistik verwendet, z. B. Strom oder Wasser.",
+          "meter_number": "Die Zählernummer aus dem Portal, z. B. CH1007201234500000000000000014185.",
+          "unit": "Muss der Einheit entsprechen, die das Portal exportiert.",
+          "obis_code": "1-1:1.29.0 belassen, solange das Portal keinen anderen Code verwendet.",
+          "export_type": "WirkBezug belassen, solange das Portal keinen anderen Typ verwendet."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Erneut anmelden",
+        "description": "Das Portal hat die gespeicherten Zugangsdaten für {username} abgelehnt.",
+        "data": {
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Das Portal ist nicht erreichbar.",
+      "invalid_auth": "Das Portal hat diese Zugangsdaten abgelehnt, oder das Login-Formular wurde nicht gefunden. Trage die erweiterten Login-Felder ein, um die Integration auf das richtige Formular zu lenken.",
+      "no_data": "Das Portal hat für diesen Zähler keine Messwerte geliefert. Prüfe Zählernummer, OBIS-Code und Export-Typ.",
+      "required": "Dieses Feld ist erforderlich.",
+      "invalid_unit": "Diese Einheit passt nicht zum gewählten Zählertyp.",
+      "unknown": "Unerwarteter Fehler. Details stehen im Home-Assistant-Log."
+    },
+    "abort": {
+      "already_configured": "Dieses Konto ist bereits eingerichtet.",
+      "reauth_successful": "Anmeldung erfolgreich aktualisiert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Regio Energie Smart Meter Import",
+        "menu_options": {
+          "add_meter": "Zähler hinzufügen",
+          "edit_meter": "Zähler bearbeiten",
+          "remove_meter": "Zähler entfernen",
+          "settings": "Abruf- und Login-Einstellungen"
+        }
+      },
+      "add_meter": {
+        "title": "Zähler hinzufügen",
+        "data": {
+          "name": "Name",
+          "meter_type": "Typ",
+          "meter_number": "Zählernummer",
+          "unit": "Einheit",
+          "obis_code": "OBIS-Code",
+          "export_type": "Export-Typ"
+        },
+        "data_description": {
+          "name": "Wird als Name der Statistik verwendet, z. B. Strom oder Wasser.",
+          "meter_number": "Die Zählernummer aus dem Portal.",
+          "unit": "Muss der Einheit entsprechen, die das Portal exportiert.",
+          "obis_code": "1-1:1.29.0 belassen, solange das Portal keinen anderen Code verwendet.",
+          "export_type": "WirkBezug belassen, solange das Portal keinen anderen Typ verwendet."
+        }
+      },
+      "edit_meter": {
+        "title": "Zähler bearbeiten",
+        "data": {
+          "statistic_id": "Zähler"
+        }
+      },
+      "meter_details": {
+        "title": "Zähler bearbeiten",
+        "description": "Ein neuer Name verschiebt die bisherige Historie nicht: die Statistik bleibt {statistic_id}.",
+        "data": {
+          "name": "Name",
+          "meter_type": "Typ",
+          "meter_number": "Zählernummer",
+          "unit": "Einheit",
+          "obis_code": "OBIS-Code",
+          "export_type": "Export-Typ"
+        }
+      },
+      "remove_meter": {
+        "title": "Zähler entfernen",
+        "description": "Entfernte Zähler werden nicht mehr abgefragt. Ihre Statistiken bleiben in Home Assistant und lassen sich unter Entwicklerwerkzeuge > Statistiken löschen.",
+        "data": {
+          "meters": "Zu entfernende Zähler"
+        }
+      },
+      "settings": {
+        "title": "Abruf- und Login-Einstellungen",
+        "data": {
+          "days_to_fetch": "Tage pro Abruf",
+          "scan_interval_hours": "Abrufintervall (Stunden)",
+          "login_url": "Login-Seite (optional)",
+          "username_field": "Formularfeld Benutzername (optional)",
+          "password_field": "Formularfeld Passwort (optional)"
+        },
+        "data_description": {
+          "days_to_fetch": "Wie weit jeder Abruf zurückliest. Die Überlappung übernimmt Werte, die der Versorger nachträglich korrigiert.",
+          "scan_interval_hours": "Das Portal veröffentlicht neue Daten üblicherweise einmal täglich.",
+          "login_url": "Vollständige Adresse der Login-Seite, falls sie nicht automatisch gefunden wird.",
+          "username_field": "Name des Benutzername-Felds im Login-Formular.",
+          "password_field": "Name des Passwort-Felds im Login-Formular."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Das Portal ist nicht erreichbar.",
+      "invalid_auth": "Das Portal hat die gespeicherten Zugangsdaten abgelehnt, oder das Login-Formular wurde nicht gefunden.",
+      "no_data": "Das Portal hat für diesen Zähler keine Messwerte geliefert. Prüfe Zählernummer, OBIS-Code und Export-Typ.",
+      "required": "Dieses Feld ist erforderlich.",
+      "invalid_unit": "Diese Einheit passt nicht zum gewählten Zählertyp.",
+      "unknown": "Unerwarteter Fehler. Details stehen im Home-Assistant-Log."
+    }
+  },
+  "selector": {
+    "meter_type": {
+      "options": {
+        "electricity": "Strom",
+        "gas": "Gas",
+        "water": "Wasser",
+        "heat": "Fernwärme"
+      }
+    }
+  }
+}
