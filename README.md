@@ -7,12 +7,18 @@ customer portal of **Regio Energie Solothurn** (`okp.regioenergie.ch`) and
 turns them into long term statistics you can use on the **energy dashboard**.
 
 Electricity, gas, water and district heating meters are supported, in any
-combination — configure only the meters you actually have.
+combination — configure only the meters you actually have. Optionally it also
+imports what that consumption **costs**, including a seasonal tariff.
 
-> The portal address is a setting, not a constant. If another Swiss utility
-> runs the same portal software, point the integration at its address and it
-> should work the same way. Reports of portals that do (or do not) work are
-> welcome in the issue tracker.
+> **Tested with electricity and water only.** Gas and district heating are
+> built in and selectable, but nobody has confirmed them against a real
+> account yet — the OBIS code or the export type may well differ there. If you
+> have such a meter, please
+> [open an issue](https://github.com/cybersponge/smart-meter-regioenergie-ha-integration/issues)
+> and say whether it worked and which values you used. Same for other Swiss
+> utilities: the portal address is a setting, not a constant, so if another
+> utility runs the same portal software this should work — reports welcome
+> either way.
 
 ## How it works
 
@@ -66,13 +72,19 @@ directory and restart Home Assistant.
    automatically — on `okp.regioenergie.ch` it lives at
    `/de/services/login.php` — so the three advanced fields only matter for
    portals where that fails (see Troubleshooting).
-2. **Meter** — name, type, meter number, unit, OBIS code and export type. The
-   meter number is the long identifier shown in the portal, for example
-   `CH1007201234500000000000000014185`. `1-1:1.29.0` / `WirkBezug` are the
-   defaults used by Regio Energie Solothurn.
+2. **Meter type** — electricity, gas, water or district heating. The unit and
+   the price fields of the next step follow from it.
+3. **Meter** — name, meter number, unit, OBIS code, export type and optionally
+   the prices (see below). The unit is preset to the one the meter type is
+   billed in (`kWh` for electricity, `m³` for water), and `1-1:1.29.0` /
+   `WirkBezug` are the defaults used by Regio Energie Solothurn.
 
-Both steps are verified against the portal before the entry is created, so a
-wrong password or meter number is reported right away.
+You find your meter numbers in the portal under **Lastgang**,
+<https://okp.regioenergie.ch/de/services/lastgang.php> — one long identifier
+per meter, in the form `CH1000000000000000000000000012345`.
+
+Both the account and the meter are verified against the portal before the entry
+is created, so a wrong password or meter number is reported right away.
 
 Further meters, the poll interval and the number of days per poll are managed
 under **Configure** on the integration entry.
@@ -82,18 +94,49 @@ under **Configure** on the integration entry.
 **Settings → Dashboards → Energy**, then add the statistic that matches your
 meter:
 
-| Meter type       | Add it as                                 |
-|------------------|-------------------------------------------|
-| Electricity      | Grid consumption                          |
-| Gas              | Gas consumption                           |
-| Water            | Water consumption                         |
-| District heating | Individual device / another energy source |
+| Meter type                  | Add it as                                 |
+|-----------------------------|-------------------------------------------|
+| Electricity                 | Grid consumption                          |
+| Water                       | Water consumption                         |
+| Gas (untested)              | Gas consumption                           |
+| District heating (untested) | Individual device / another energy source |
 
 The statistics are named `regioenergie_import:<name>_import`, for example
 `regioenergie_import:water_import`.
 
 Data usually appears with roughly one day of delay — that is how fast the
 utility publishes it, not a limitation of the integration.
+
+## Costs
+
+Each meter takes two optional prices, in the currency configured in Home
+Assistant:
+
+| Field                          | Meaning                                                            |
+|--------------------------------|--------------------------------------------------------------------|
+| Price per unit                 | Applies all year, unless a winter price is given.                  |
+| Winter price, October to March | Higher rate of the winter half year. Leave empty if there is none. |
+
+Enter a price and the integration imports a **second statistic** per meter,
+`regioenergie_import:<name>_cost`, holding the running cost. In the energy
+dashboard, pick it under the source's cost setting as **"Use a statistic
+tracking total costs"**.
+
+Two things worth knowing:
+
+- **The other two cost options do not work here.** "Use a static price" and
+  "Use an entity with current price" are computed by an entity that watches the
+  *state* of the consumption entity — and an external statistic has no entity
+  and no state. That is why the integration calculates the cost itself.
+- **Every hour is priced with the tariff of its own month**, so a backfill of
+  past years is billed correctly rather than at today's price. Changing a price
+  later re-prices all hours the next polls re-read; to re-price the whole
+  history, raise *Days per poll* once (see Options).
+
+For **water**, add the water and the wastewater price together — that sum is
+the real price per m³. For **electricity**, Regio Energie bills April to
+September at a lower rate and October to March at a higher one, so fill in both
+fields.
 
 ## Options
 
@@ -119,8 +162,9 @@ finds, the field names, and the first lines of the CSV export. Put the reported
 values into the advanced login fields of the config flow.
 
 **"The portal returned no readings for this meter."** — the meter number, the
-OBIS code or the export type does not match. The probe script shows the raw
-answer of the portal for a given meter.
+OBIS code or the export type does not match. Compare the number against the
+list under <https://okp.regioenergie.ch/de/services/lastgang.php>; the probe
+script shows the raw answer of the portal for a given meter.
 
 **Debug logging**
 

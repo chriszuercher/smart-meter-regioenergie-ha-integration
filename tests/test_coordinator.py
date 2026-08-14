@@ -8,9 +8,12 @@ import pytest
 from custom_components.regioenergie_import import coordinator as coordinator_module
 from custom_components.regioenergie_import.api import MeterReading, parse_csv
 from custom_components.regioenergie_import.const import (
+    CONF_COST_STATISTIC_ID,
     CONF_EXPORT_TYPE,
     CONF_METER_NUMBER,
     CONF_OBIS_CODE,
+    CONF_PRICE,
+    CONF_PRICE_WINTER,
     CONF_STATISTIC_ID,
     CONF_UNIT,
 )
@@ -18,7 +21,9 @@ from custom_components.regioenergie_import.coordinator import (
     RegioEnergieCoordinator,
     build_hourly_totals,
     build_metadata,
+    cost_statistic_id_for,
     drop_unpublished_tail,
+    price_at,
 )
 
 ZURICH = ZoneInfo("Europe/Zurich")
@@ -28,7 +33,7 @@ NOW = datetime(2026, 8, 13, 12, 0, tzinfo=ZURICH)
 
 METER = {
     "name": "Water",
-    CONF_METER_NUMBER: "CH8000051234500000000000000014186",
+    CONF_METER_NUMBER: "CH1000000000000000000000000012345",
     CONF_OBIS_CODE: "1-1:1.29.0",
     CONF_EXPORT_TYPE: "WirkBezug",
     CONF_UNIT: "m³",
@@ -77,10 +82,19 @@ def imported(monkeypatch):
     return captured
 
 
+class FakeHass:
+    """Just enough of hass for the import: the configured currency."""
+
+    class config:
+        """Stand-in for hass.config."""
+
+        currency = "CHF"
+
+
 def make_coordinator(client) -> RegioEnergieCoordinator:
     """Build a coordinator without going through Home Assistant's setup."""
     instance = RegioEnergieCoordinator.__new__(RegioEnergieCoordinator)
-    instance.hass = object()
+    instance.hass = FakeHass()
     instance.client = client
     instance._timezone = ZURICH
     return instance
@@ -212,7 +226,10 @@ async def test_import_builds_a_running_total(imported, monkeypatch) -> None:
         "imported": 2,
         "last_sum": 7.0,
         "last_hour": "2026-08-13T02:00:00+02:00",
+        "last_cost_sum": None,
     }
+    # No price configured, so no cost statistic was written.
+    assert len(imported) == 1
 
 
 @pytest.mark.asyncio
@@ -283,6 +300,132 @@ async def test_import_without_readings_pushes_nothing(imported, monkeypatch) -> 
 
     assert imported == []
     assert result["imported"] == 0
+
+
+# --- costs -----------------------------------------------------------------
+
+
+def test_cost_statistic_id_sits_next_to_the_consumption_one() -> None:
+    """The cost statistic is derived from the consumption statistic."""
+    from homeassistant.components.recorder.statistics import valid_statistic_id
+
+    cost_id = cost_statistic_id_for("regioenergie_import:strom_import")
+
+    assert cost_id == "regioenergie_import:strom_cost"
+    assert valid_statistic_id(cost_id)
+
+
+def test_a_meter_without_a_price_has_no_cost() -> None:
+    """Prices are optional."""
+    assert price_at(METER, NOW) is None
+
+
+def test_a_single_price_applies_all_year() -> None:
+    """Without a winter price the base price holds in every month."""
+    meter = {**METER, CONF_PRICE: 2.5}
+
+    assert price_at(meter, datetime(2026, 1, 15, tzinfo=ZURICH)) == 2.5
+    assert price_at(meter, datetime(2026, 7, 15, tzinfo=ZURICH)) == 2.5
+
+
+@pytest.mark.parametrize(
+    ("month", "expected"),
+    [
+        (3, 0.30),  # March still winter
+        (4, 0.20),  # April starts the summer rate
+        (9, 0.20),  # September is the last summer month
+        (10, 0.30),  # October back to winter
+    ],
+)
+def test_seasonal_price_switches_in_april_and_october(
+    month: int, expected: float
+) -> None:
+    """Summer runs April to September, the rest of the year is dearer."""
+    meter = {**METER, CONF_PRICE: 0.20, CONF_PRICE_WINTER: 0.30}
+
+    assert price_at(meter, datetime(2026, month, 15, tzinfo=ZURICH)) == expected
+
+
+@pytest.mark.asyncio
+async def test_cost_statistic_is_imported_next_to_consumption(
+    imported, monkeypatch
+) -> None:
+    """A priced meter yields a second statistic with the running cost."""
+    monkeypatch.setattr(
+        coordinator_module, "statistics_during_period", stub_statistics({})
+    )
+    meter = {
+        **METER,
+        CONF_PRICE: 2.0,
+        CONF_COST_STATISTIC_ID: "regioenergie_import:water_cost",
+    }
+    instance = make_coordinator(FakeClient([reading(1, 15, 1.5), reading(2, 15, 2.5)]))
+
+    result = await instance._async_import_meter(
+        meter, date(2026, 8, 6), date(2026, 8, 13), NOW
+    )
+
+    consumption_meta, consumption = imported[0]
+    cost_meta, cost = imported[1]
+    assert [row["sum"] for row in consumption] == [1.5, 4.0]
+    # Same hours, multiplied by the price and accumulated the same way.
+    assert [row["start"] for row in cost] == [row["start"] for row in consumption]
+    assert [row["sum"] for row in cost] == [3.0, 8.0]
+    assert cost_meta["statistic_id"] == "regioenergie_import:water_cost"
+    assert cost_meta["has_sum"] is True
+    # The cost carries the currency, the consumption the meter's own unit.
+    assert cost_meta["unit_of_measurement"] == "CHF"
+    assert consumption_meta["unit_of_measurement"] == "m³"
+    assert result["last_cost_sum"] == 8.0
+
+
+@pytest.mark.asyncio
+async def test_cost_uses_the_price_of_each_hour(imported, monkeypatch) -> None:
+    """A backfill across the tariff switch is priced month by month."""
+    monkeypatch.setattr(
+        coordinator_module, "statistics_during_period", stub_statistics({})
+    )
+    meter = {**METER, CONF_PRICE: 0.20, CONF_PRICE_WINTER: 0.30}
+    instance = make_coordinator(
+        FakeClient(
+            [
+                MeterReading(datetime(2026, 9, 30, 23, 45, tzinfo=ZURICH), 10.0),
+                MeterReading(datetime(2026, 10, 1, 1, 0, tzinfo=ZURICH), 10.0),
+            ]
+        )
+    )
+
+    await instance._async_import_meter(
+        meter,
+        date(2026, 9, 1),
+        date(2026, 10, 2),
+        datetime(2026, 10, 2, 12, 0, tzinfo=ZURICH),
+    )
+
+    # 10 units in September at 0.20, then 10 in October at 0.30.
+    assert [row["sum"] for row in imported[1][1]] == [2.0, 5.0]
+
+
+@pytest.mark.asyncio
+async def test_cost_continues_its_own_running_total(imported, monkeypatch) -> None:
+    """The cost statistic keeps its own baseline, not the consumption one."""
+    windows = {timedelta(hours=1): [{"sum": 100.0}]}
+    monkeypatch.setattr(
+        coordinator_module,
+        "statistics_during_period",
+        lambda hass, start, end, ids, period, units, types: (
+            {next(iter(ids)): windows[end - start]}
+            if end - start in windows and "cost" in next(iter(ids))
+            else {}
+        ),
+    )
+    meter = {**METER, CONF_PRICE: 2.0}
+    instance = make_coordinator(FakeClient([reading(1, 15, 1.5)]))
+
+    await instance._async_import_meter(meter, date(2026, 8, 6), date(2026, 8, 13), NOW)
+
+    assert [row["sum"] for row in imported[0][1]] == [1.5]  # consumption from 0
+    assert [row["sum"] for row in imported[1][1]] == [103.0]  # cost from 100
 
 
 # --- metadata --------------------------------------------------------------

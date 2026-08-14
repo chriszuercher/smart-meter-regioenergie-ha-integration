@@ -25,11 +25,14 @@ from .api import (
     RegioEnergieError,
 )
 from .const import (
+    CONF_COST_STATISTIC_ID,
     CONF_DAYS_TO_FETCH,
     CONF_EXPORT_TYPE,
     CONF_METER_NUMBER,
     CONF_METERS,
     CONF_OBIS_CODE,
+    CONF_PRICE,
+    CONF_PRICE_WINTER,
     CONF_SCAN_INTERVAL_HOURS,
     CONF_STATISTIC_ID,
     CONF_UNIT,
@@ -40,6 +43,7 @@ from .const import (
     DOMAIN,
     INTERVAL_END_OFFSET,
     PORTAL_TIMEZONE,
+    SUMMER_MONTHS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -90,6 +94,25 @@ def build_metadata(statistic_id: str, name: str, unit: str) -> StatisticMetaData
         converter = STATISTIC_UNIT_TO_UNIT_CONVERTER.get(unit)
         metadata["unit_class"] = converter.UNIT_CLASS if converter else None
     return cast(StatisticMetaData, metadata)
+
+
+def cost_statistic_id_for(statistic_id: str) -> str:
+    """Return the id of the cost statistic belonging to a consumption one."""
+    return statistic_id.removesuffix("_import") + "_cost"
+
+
+def price_at(meter: dict[str, Any], hour: datetime) -> float | None:
+    """Return the price per unit that applies at a given hour.
+
+    None means the meter has no price configured and gets no cost statistic.
+    """
+    base = meter.get(CONF_PRICE)
+    if base is None:
+        return None
+    winter = meter.get(CONF_PRICE_WINTER)
+    if winter is None or hour.month in SUMMER_MONTHS:
+        return float(base)
+    return float(winter)
 
 
 def drop_unpublished_tail(readings: list[MeterReading]) -> list[MeterReading]:
@@ -233,12 +256,61 @@ class RegioEnergieCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             statistics[-1]["sum"],
         )
 
-        return {
+        result = {
             "statistic_id": statistic_id,
             "imported": len(statistics),
             "last_sum": statistics[-1]["sum"],
             "last_hour": hours[-1].isoformat(),
         }
+        result["last_cost_sum"] = await self._async_import_cost(
+            meter, name, hours, hourly_totals
+        )
+        return result
+
+    async def _async_import_cost(
+        self,
+        meter: dict[str, Any],
+        name: str,
+        hours: list[datetime],
+        hourly_totals: dict[datetime, float],
+    ) -> float | None:
+        """Import what the consumption of those hours costs, if priced.
+
+        The energy dashboard cannot price an external statistic on its own: its
+        cost sensor reads the state of an entity, and a statistic has none. So
+        the cost is imported as a statistic of its own, which the dashboard
+        accepts as "a statistic tracking total costs". Doing it here also means
+        every hour is priced with the tariff that applied back then.
+        """
+        if price_at(meter, hours[0]) is None:
+            return None
+
+        cost_statistic_id = meter.get(CONF_COST_STATISTIC_ID) or cost_statistic_id_for(
+            meter[CONF_STATISTIC_ID]
+        )
+        running_sum = await self._async_get_baseline_sum(cost_statistic_id, hours[0])
+
+        statistics: list[StatisticData] = []
+        for hour in hours:
+            running_sum += hourly_totals[hour] * (price_at(meter, hour) or 0.0)
+            statistics.append(StatisticData(start=hour, sum=round(running_sum, 4)))
+
+        async_add_external_statistics(
+            self.hass,
+            build_metadata(
+                cost_statistic_id,
+                f"{name} cost",
+                self.hass.config.currency,
+            ),
+            statistics,
+        )
+        _LOGGER.debug(
+            "Imported %s hourly cost statistics for %s (last sum %s)",
+            len(statistics),
+            name,
+            statistics[-1]["sum"],
+        )
+        return statistics[-1]["sum"]
 
     async def _async_get_baseline_sum(
         self, statistic_id: str, first_hour: datetime

@@ -3,22 +3,29 @@
 import pytest
 
 from custom_components.regioenergie_import.config_flow import (
+    _meter_details_schema,
     _validate_meter_input,
+    assign_statistic_ids,
     build_statistic_id,
 )
 from custom_components.regioenergie_import.const import (
+    CONF_COST_STATISTIC_ID,
     CONF_METER_NUMBER,
     CONF_METER_TYPE,
     CONF_OBIS_CODE,
+    CONF_PRICE,
+    CONF_PRICE_WINTER,
+    CONF_STATISTIC_ID,
     CONF_UNIT,
     DEFAULT_OBIS_CODE,
+    DEFAULT_UNIT_BY_METER_TYPE,
 )
 from homeassistant.components.recorder.statistics import valid_statistic_id
 
 VALID_METER = {
     "name": "Water",
     CONF_METER_TYPE: "water",
-    CONF_METER_NUMBER: "CH8000051234500000000000000014186",
+    CONF_METER_NUMBER: "CH1000000000000000000000000012345",
     CONF_OBIS_CODE: DEFAULT_OBIS_CODE,
     CONF_UNIT: "m³",
 }
@@ -87,3 +94,76 @@ def test_every_meter_type_has_a_working_default(meter_type: str, unit: str) -> N
     meter = {**VALID_METER, CONF_METER_TYPE: meter_type, CONF_UNIT: unit}
 
     assert _validate_meter_input(meter) == {}
+
+
+@pytest.mark.parametrize("meter_type", ["electricity", "gas", "water", "heat"])
+def test_the_unit_is_preset_for_the_chosen_type(meter_type: str) -> None:
+    """Picking the type fills the unit box with what that meter is billed in."""
+    schema = _meter_details_schema(meter_type, {})
+
+    filled = schema(
+        {
+            "name": "Meter",
+            CONF_METER_NUMBER: "CH1",
+            CONF_OBIS_CODE: DEFAULT_OBIS_CODE,
+            "export_type": "WirkBezug",
+        }
+    )
+
+    assert filled[CONF_UNIT] == DEFAULT_UNIT_BY_METER_TYPE[meter_type]
+    assert _validate_meter_input({**filled, CONF_METER_TYPE: meter_type}) == {}
+
+
+def test_only_units_of_the_chosen_type_are_offered() -> None:
+    """A water meter cannot even be offered kWh."""
+    schema = _meter_details_schema("water", {})
+
+    unit_key = next(key for key in schema.schema if str(key) == CONF_UNIT)
+
+    assert schema.schema[unit_key].config["options"] == ["m³", "L"]
+
+
+def test_a_price_can_be_cleared_again() -> None:
+    """An emptied price box must not be refilled with the old value."""
+    schema = _meter_details_schema("water", {**VALID_METER, CONF_PRICE: 4.25})
+
+    submitted = schema(
+        {
+            "name": "Water",
+            CONF_METER_NUMBER: "CH1",
+            CONF_UNIT: "m³",
+            CONF_OBIS_CODE: DEFAULT_OBIS_CODE,
+            "export_type": "WirkBezug",
+        }
+    )
+
+    assert CONF_PRICE not in submitted
+
+
+def test_a_winter_price_needs_a_base_price() -> None:
+    """The winter price is the exception, not the only price."""
+    errors = _validate_meter_input({**VALID_METER, CONF_PRICE_WINTER: 0.30})
+
+    assert errors == {CONF_PRICE: "price_required"}
+
+
+def test_both_prices_together_are_valid() -> None:
+    """The seasonal pair is what an electricity meter normally gets."""
+    meter = {
+        **VALID_METER,
+        CONF_METER_TYPE: "electricity",
+        CONF_UNIT: "kWh",
+        CONF_PRICE: 0.20,
+        CONF_PRICE_WINTER: 0.30,
+    }
+
+    assert _validate_meter_input(meter) == {}
+
+
+def test_a_new_meter_gets_both_statistic_ids() -> None:
+    """Consumption and cost ids are fixed when the meter is created."""
+    meter = assign_statistic_ids({**VALID_METER, "name": "Strom"}, set())
+
+    assert meter[CONF_STATISTIC_ID] == "regioenergie_import:strom_import"
+    assert meter[CONF_COST_STATISTIC_ID] == "regioenergie_import:strom_cost"
+    assert valid_statistic_id(meter[CONF_COST_STATISTIC_ID])

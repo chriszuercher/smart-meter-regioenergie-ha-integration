@@ -20,23 +20,33 @@
           "password_field": "Name of the password input in the login form."
         }
       },
-      "meter": {
+      "meter_type": {
+        "title": "What does the meter measure?",
+        "description": "The unit and the prices on the next screen follow from this. Electricity and water are tested; gas and district heating are not - please report back if they work for you.",
+        "data": {
+          "meter_type": "Type"
+        }
+      },
+      "meter_details": {
         "title": "Add meter",
-        "description": "Enter the first meter. Further meters can be added later under the integration options.",
+        "description": "Prices are optional and are given in {currency} per {unit}. Enter one and the integration imports a second statistic with the costs, which the energy dashboard accepts as \"a statistic tracking total costs\".\n\nRegio Energie bills electricity at a lower rate from April to September and a higher one from October to March - enter both. For water enter only the first price, and add the water and the wastewater price together to get the real price per m³.",
         "data": {
           "name": "Name",
-          "meter_type": "Type",
           "meter_number": "Meter number",
           "unit": "Unit",
           "obis_code": "OBIS code",
-          "export_type": "Export type"
+          "export_type": "Export type",
+          "price": "Price per unit (optional)",
+          "price_winter": "Winter price, October to March (optional)"
         },
         "data_description": {
           "name": "Used for the statistic name, e.g. Electricity or Water.",
-          "meter_number": "The meter number shown in the portal, e.g. CH1007201234500000000000000014185.",
+          "meter_number": "Listed in the portal under Lastgang, on okp.regioenergie.ch at /de/services/lastgang.php.",
           "unit": "Must match the unit the portal exports.",
           "obis_code": "Leave at 1-1:1.29.0 unless the portal uses a different code.",
-          "export_type": "Leave at WirkBezug unless the portal uses a different one."
+          "export_type": "Leave at WirkBezug unless the portal uses a different one.",
+          "price": "Applies all year unless a winter price is set.",
+          "price_winter": "Leave empty if the price is the same all year."
         }
       },
       "reauth_confirm": {
@@ -54,6 +64,7 @@
       "no_data": "The portal returned no readings for this meter. Check the meter number, the OBIS code and the export type.",
       "required": "This field is required.",
       "invalid_unit": "This unit does not fit the selected meter type.",
+      "price_required": "A winter price needs a base price as well.",
       "unknown": "Unexpected error. Check the Home Assistant log for details."
     },
     "abort": {
@@ -72,40 +83,39 @@
           "settings": "Polling and login settings"
         }
       },
-      "add_meter": {
-        "title": "Add meter",
+      "meter_type": {
+        "title": "What does the meter measure?",
+        "description": "The unit and the prices on the next screen follow from this. Electricity and water are tested; gas and district heating are not - please report back if they work for you.",
+        "data": {
+          "meter_type": "Type"
+        }
+      },
+      "meter_details": {
+        "title": "Meter",
+        "description": "Prices are optional and are given in {currency} per {unit}. Enter one and the integration imports a second statistic with the costs, which the energy dashboard accepts as \"a statistic tracking total costs\".\n\nRegio Energie bills electricity at a lower rate from April to September and a higher one from October to March - enter both. For water enter only the first price, and add the water and the wastewater price together to get the real price per m³.\n\nRenaming a meter keeps its statistics where they are.",
         "data": {
           "name": "Name",
-          "meter_type": "Type",
           "meter_number": "Meter number",
           "unit": "Unit",
           "obis_code": "OBIS code",
-          "export_type": "Export type"
+          "export_type": "Export type",
+          "price": "Price per unit (optional)",
+          "price_winter": "Winter price, October to March (optional)"
         },
         "data_description": {
           "name": "Used for the statistic name, e.g. Electricity or Water.",
-          "meter_number": "The meter number shown in the portal.",
+          "meter_number": "Listed in the portal under Lastgang, on okp.regioenergie.ch at /de/services/lastgang.php.",
           "unit": "Must match the unit the portal exports.",
           "obis_code": "Leave at 1-1:1.29.0 unless the portal uses a different code.",
-          "export_type": "Leave at WirkBezug unless the portal uses a different one."
+          "export_type": "Leave at WirkBezug unless the portal uses a different one.",
+          "price": "Applies all year unless a winter price is set.",
+          "price_winter": "Leave empty if the price is the same all year."
         }
       },
       "edit_meter": {
         "title": "Edit meter",
         "data": {
           "statistic_id": "Meter"
-        }
-      },
-      "meter_details": {
-        "title": "Edit meter",
-        "description": "Changing the name does not move the collected history: the statistic stays {statistic_id}.",
-        "data": {
-          "name": "Name",
-          "meter_type": "Type",
-          "meter_number": "Meter number",
-          "unit": "Unit",
-          "obis_code": "OBIS code",
-          "export_type": "Export type"
         }
       },
       "remove_meter": {
@@ -139,6 +149,7 @@
       "no_data": "The portal returned no readings for this meter. Check the meter number, the OBIS code and the export type.",
       "required": "This field is required.",
       "invalid_unit": "This unit does not fit the selected meter type.",
+      "price_required": "A winter price needs a base price as well.",
       "unknown": "Unexpected error. Check the Home Assistant log for details."
     }
   },
@@ -146,9 +157,9 @@
     "meter_type": {
       "options": {
         "electricity": "Electricity",
-        "gas": "Gas",
+        "gas": "Gas (untested)",
         "water": "Water",
-        "heat": "District heating"
+        "heat": "District heating (untested)"
       }
     }
   }

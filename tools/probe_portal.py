@@ -7,7 +7,7 @@ number returns data:
 
     python3 tools/probe_portal.py \
         --username YOU --password SECRET \
-        --meter CH1007201234500000000000000014185
+        --meter CH1000000000000000000000000012345
 
 It prints the discovered login form (including hidden/CSRF fields), whether the
 login was accepted, and the first lines of the CSV export. The field names it

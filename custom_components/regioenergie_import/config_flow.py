@@ -40,8 +40,8 @@ from .api import (
     RegioEnergieError,
 )
 from .const import (
-    ALL_UNITS,
     CONF_BASE_URL,
+    CONF_COST_STATISTIC_ID,
     CONF_DAYS_TO_FETCH,
     CONF_EXPORT_TYPE,
     CONF_LOGIN_URL,
@@ -50,6 +50,8 @@ from .const import (
     CONF_METERS,
     CONF_OBIS_CODE,
     CONF_PASSWORD_FIELD,
+    CONF_PRICE,
+    CONF_PRICE_WINTER,
     CONF_SCAN_INTERVAL_HOURS,
     CONF_STATISTIC_ID,
     CONF_UNIT,
@@ -70,6 +72,7 @@ from .const import (
     PORTAL_TIMEZONE,
     UNITS_BY_METER_TYPE,
 )
+from .coordinator import cost_statistic_id_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,6 +93,23 @@ def build_statistic_id(name: str, taken: set[str]) -> str:
         candidate = f"{DOMAIN}:{base}_{index}_import"
         index += 1
     return candidate
+
+
+def assign_statistic_ids(meter: dict[str, Any], taken: set[str]) -> dict[str, Any]:
+    """Give a new meter its permanent consumption and cost statistic ids."""
+    statistic_id = build_statistic_id(meter[CONF_NAME], taken)
+    return meter | {
+        CONF_STATISTIC_ID: statistic_id,
+        CONF_COST_STATISTIC_ID: cost_statistic_id_for(statistic_id),
+    }
+
+
+def _meter_placeholders(hass: HomeAssistant, meter_type: str) -> dict[str, str]:
+    """Return the currency and unit the price fields are asked in."""
+    return {
+        "currency": hass.config.currency or "",
+        "unit": DEFAULT_UNIT_BY_METER_TYPE[meter_type],
+    }
 
 
 def _credentials_schema(defaults: Mapping[str, Any]) -> vol.Schema:
@@ -120,30 +140,57 @@ def _credentials_schema(defaults: Mapping[str, Any]) -> vol.Schema:
     )
 
 
-def _meter_schema(defaults: Mapping[str, Any]) -> vol.Schema:
-    """Return the schema of the meter step."""
-    meter_type = defaults.get(CONF_METER_TYPE, METER_TYPE_ELECTRICITY)
+def _meter_type_schema(defaults: Mapping[str, Any]) -> vol.Schema:
+    """Return the schema of the step that asks what is being metered."""
     return vol.Schema(
         {
             vol.Required(
-                CONF_NAME, default=defaults.get(CONF_NAME, "")
-            ): TextSelector(),
-            vol.Required(CONF_METER_TYPE, default=meter_type): SelectSelector(
+                CONF_METER_TYPE,
+                default=defaults.get(CONF_METER_TYPE, METER_TYPE_ELECTRICITY),
+            ): SelectSelector(
                 SelectSelectorConfig(
                     options=list(METER_TYPES),
                     translation_key="meter_type",
                     mode=SelectSelectorMode.DROPDOWN,
                 )
-            ),
+            )
+        }
+    )
+
+
+def _price_field(key: str, defaults: Mapping[str, Any]) -> vol.Optional:
+    """Return an optional price key that can also be cleared again.
+
+    `suggested_value` prefills the box without voluptuous putting the old value
+    back when the box is submitted empty - which a plain `default` would do,
+    making a price impossible to remove.
+    """
+    suggested = defaults.get(key)
+    description = {"suggested_value": suggested} if suggested is not None else None
+    return vol.Optional(key, description=description)
+
+
+def _meter_details_schema(meter_type: str, defaults: Mapping[str, Any]) -> vol.Schema:
+    """Return the schema of the meter step for an already chosen type."""
+    price_selector = NumberSelector(
+        NumberSelectorConfig(min=0, step="any", mode=NumberSelectorMode.BOX)
+    )
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_NAME, default=defaults.get(CONF_NAME, "")
+            ): TextSelector(),
             vol.Required(
                 CONF_METER_NUMBER, default=defaults.get(CONF_METER_NUMBER, "")
             ): TextSelector(),
             vol.Required(
                 CONF_UNIT,
+                # Preset with the unit this kind of meter is billed in, and
+                # only offer the units that fit it.
                 default=defaults.get(CONF_UNIT, DEFAULT_UNIT_BY_METER_TYPE[meter_type]),
             ): SelectSelector(
                 SelectSelectorConfig(
-                    options=list(ALL_UNITS),
+                    options=list(UNITS_BY_METER_TYPE[meter_type]),
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             ),
@@ -154,6 +201,8 @@ def _meter_schema(defaults: Mapping[str, Any]) -> vol.Schema:
                 CONF_EXPORT_TYPE,
                 default=defaults.get(CONF_EXPORT_TYPE, DEFAULT_EXPORT_TYPE),
             ): TextSelector(),
+            _price_field(CONF_PRICE, defaults): price_selector,
+            _price_field(CONF_PRICE_WINTER, defaults): price_selector,
         }
     )
 
@@ -177,6 +226,8 @@ def _validate_meter_input(meter: Mapping[str, Any]) -> dict[str, str]:
         errors[CONF_OBIS_CODE] = "required"
     if meter.get(CONF_UNIT) not in UNITS_BY_METER_TYPE[meter[CONF_METER_TYPE]]:
         errors[CONF_UNIT] = "invalid_unit"
+    if meter.get(CONF_PRICE_WINTER) is not None and meter.get(CONF_PRICE) is None:
+        errors[CONF_PRICE] = "price_required"
     return errors
 
 
@@ -255,6 +306,7 @@ class RegioEnergieConfigFlow(ConfigFlow, domain=DOMAIN):
         """Initialise the flow."""
         self._credentials: dict[str, Any] = {}
         self._login_options: dict[str, Any] = {}
+        self._meter_type: str = METER_TYPE_ELECTRICITY
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -286,7 +338,7 @@ class RegioEnergieConfigFlow(ConfigFlow, domain=DOMAIN):
             if not errors:
                 self._credentials = credentials
                 self._login_options = login_options
-                return await self.async_step_meter()
+                return await self.async_step_meter_type()
 
         return self.async_show_form(
             step_id="user",
@@ -294,21 +346,33 @@ class RegioEnergieConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_meter(
+    async def async_step_meter_type(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask what the first meter measures."""
+        if user_input is not None:
+            self._meter_type = user_input[CONF_METER_TYPE]
+            return await self.async_step_meter_details()
+
+        return self.async_show_form(
+            step_id="meter_type",
+            data_schema=_meter_type_schema({CONF_METER_TYPE: self._meter_type}),
+        )
+
+    async def async_step_meter_details(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Ask for the first meter and create the entry."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            meter = _clean_meter_input(user_input)
+            meter = _clean_meter_input(user_input) | {CONF_METER_TYPE: self._meter_type}
             errors = _validate_meter_input(meter)
             if not errors:
                 errors = await async_probe_with_errors(
                     self.hass, self._credentials, self._login_options, meter
                 )
             if not errors:
-                meter[CONF_STATISTIC_ID] = build_statistic_id(meter[CONF_NAME], set())
                 return self.async_create_entry(
                     title=self._credentials[CONF_USERNAME],
                     data=self._credentials,
@@ -316,14 +380,15 @@ class RegioEnergieConfigFlow(ConfigFlow, domain=DOMAIN):
                         **self._login_options,
                         CONF_DAYS_TO_FETCH: DEFAULT_DAYS_TO_FETCH,
                         CONF_SCAN_INTERVAL_HOURS: DEFAULT_SCAN_INTERVAL_HOURS,
-                        CONF_METERS: [meter],
+                        CONF_METERS: [assign_statistic_ids(meter, set())],
                     },
                 )
 
         return self.async_show_form(
-            step_id="meter",
-            data_schema=_meter_schema(user_input or {}),
+            step_id="meter_details",
+            data_schema=_meter_details_schema(self._meter_type, user_input or {}),
             errors=errors,
+            description_placeholders=_meter_placeholders(self.hass, self._meter_type),
         )
 
     async def async_step_reauth(
@@ -391,6 +456,7 @@ class RegioEnergieOptionsFlow(OptionsFlow):
             dict(meter) for meter in config_entry.options.get(CONF_METERS, [])
         ]
         self._selected: str | None = None
+        self._draft: dict[str, Any] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -405,28 +471,9 @@ class RegioEnergieOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Add another meter to this account."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            meter = _clean_meter_input(user_input)
-            errors = _validate_meter_input(meter)
-            if not errors:
-                errors = await async_probe_with_errors(
-                    self.hass, self._entry.data, self._options, meter
-                )
-            if not errors:
-                meter[CONF_STATISTIC_ID] = build_statistic_id(
-                    meter[CONF_NAME],
-                    {existing[CONF_STATISTIC_ID] for existing in self._meters},
-                )
-                self._meters.append(meter)
-                return self._save()
-
-        return self.async_show_form(
-            step_id="add_meter",
-            data_schema=_meter_schema(user_input or {}),
-            errors=errors,
-        )
+        self._selected = None
+        self._draft = {}
+        return await self.async_step_meter_type()
 
     async def async_step_edit_meter(
         self, user_input: dict[str, Any] | None = None
@@ -434,7 +481,11 @@ class RegioEnergieOptionsFlow(OptionsFlow):
         """Pick the meter to edit."""
         if user_input is not None:
             self._selected = user_input[CONF_STATISTIC_ID]
-            return await self.async_step_meter_details()
+            index = self._selected_index()
+            if index is None:
+                return await self.async_step_init()
+            self._draft = dict(self._meters[index])
+            return await self.async_step_meter_type()
 
         return self.async_show_form(
             step_id="edit_meter",
@@ -450,39 +501,59 @@ class RegioEnergieOptionsFlow(OptionsFlow):
             ),
         )
 
+    async def async_step_meter_type(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask what the meter measures, so its unit can be preset."""
+        if user_input is not None:
+            self._draft[CONF_METER_TYPE] = user_input[CONF_METER_TYPE]
+            return await self.async_step_meter_details()
+
+        return self.async_show_form(
+            step_id="meter_type", data_schema=_meter_type_schema(self._draft)
+        )
+
     async def async_step_meter_details(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Change the settings of the selected meter."""
-        index = self._selected_index()
-        if index is None:
-            return await self.async_step_init()
-
-        current = self._meters[index]
+        """Fill in the meter, either a new one or the one picked for editing."""
+        meter_type = self._draft.get(CONF_METER_TYPE, METER_TYPE_ELECTRICITY)
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            meter = _clean_meter_input(user_input)
+            meter = _clean_meter_input(user_input) | {CONF_METER_TYPE: meter_type}
             errors = _validate_meter_input(meter)
             if not errors:
                 errors = await async_probe_with_errors(
                     self.hass, self._entry.data, self._options, meter
                 )
             if not errors:
-                # The statistic id stays as it is, otherwise the history
-                # collected so far would be orphaned.
-                meter[CONF_STATISTIC_ID] = current[CONF_STATISTIC_ID]
-                self._meters[index] = meter
+                index = self._selected_index()
+                if index is None:
+                    self._meters.append(
+                        assign_statistic_ids(
+                            meter,
+                            {existing[CONF_STATISTIC_ID] for existing in self._meters},
+                        )
+                    )
+                else:
+                    # The statistic ids stay as they are, otherwise the history
+                    # collected so far would be orphaned.
+                    current = self._meters[index]
+                    self._meters[index] = meter | {
+                        CONF_STATISTIC_ID: current[CONF_STATISTIC_ID],
+                        CONF_COST_STATISTIC_ID: current.get(CONF_COST_STATISTIC_ID)
+                        or cost_statistic_id_for(current[CONF_STATISTIC_ID]),
+                    }
                 return self._save()
 
         return self.async_show_form(
             step_id="meter_details",
-            data_schema=_meter_schema(user_input or current),
+            data_schema=_meter_details_schema(
+                meter_type, user_input if user_input is not None else self._draft
+            ),
             errors=errors,
-            description_placeholders={
-                CONF_STATISTIC_ID: current[CONF_STATISTIC_ID],
-                CONF_NAME: current.get(CONF_NAME, ""),
-            },
+            description_placeholders=_meter_placeholders(self.hass, meter_type),
         )
 
     async def async_step_remove_meter(

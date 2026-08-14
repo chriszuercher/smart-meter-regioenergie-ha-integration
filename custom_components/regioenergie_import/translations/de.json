@@ -20,23 +20,33 @@
           "password_field": "Name des Passwort-Felds im Login-Formular."
         }
       },
-      "meter": {
+      "meter_type": {
+        "title": "Was misst der Zähler?",
+        "description": "Einheit und Preise auf dem nächsten Schritt richten sich danach. Strom und Wasser sind getestet, Gas und Fernwärme nicht - Rückmeldungen dazu sind willkommen.",
+        "data": {
+          "meter_type": "Typ"
+        }
+      },
+      "meter_details": {
         "title": "Zähler hinzufügen",
-        "description": "Trage den ersten Zähler ein. Weitere Zähler kannst du später in den Optionen der Integration ergänzen.",
+        "description": "Preise sind optional und werden in {currency} pro {unit} angegeben. Trägst du einen ein, importiert die Integration zusätzlich eine Statistik mit den Kosten, die das Energy Dashboard als \"Statistik, die die Gesamtkosten erfasst\" akzeptiert.\n\nRegio Energie verrechnet Strom von April bis September günstiger und von Oktober bis März teurer - trag beide Preise ein. Bei Wasser genügt der erste Preis; rechne dafür Wasser- und Abwasserpreis zusammen, das ergibt den echten Preis pro m³.",
         "data": {
           "name": "Name",
-          "meter_type": "Typ",
           "meter_number": "Zählernummer",
           "unit": "Einheit",
           "obis_code": "OBIS-Code",
-          "export_type": "Export-Typ"
+          "export_type": "Export-Typ",
+          "price": "Preis pro Einheit (optional)",
+          "price_winter": "Winterpreis, Oktober bis März (optional)"
         },
         "data_description": {
           "name": "Wird als Name der Statistik verwendet, z. B. Strom oder Wasser.",
-          "meter_number": "Die Zählernummer aus dem Portal, z. B. CH1007201234500000000000000014185.",
+          "meter_number": "Steht im Portal unter Lastgang, auf okp.regioenergie.ch unter /de/services/lastgang.php.",
           "unit": "Muss der Einheit entsprechen, die das Portal exportiert.",
           "obis_code": "1-1:1.29.0 belassen, solange das Portal keinen anderen Code verwendet.",
-          "export_type": "WirkBezug belassen, solange das Portal keinen anderen Typ verwendet."
+          "export_type": "WirkBezug belassen, solange das Portal keinen anderen Typ verwendet.",
+          "price": "Gilt ganzjährig, solange kein Winterpreis gesetzt ist.",
+          "price_winter": "Leer lassen, wenn der Preis das ganze Jahr gleich ist."
         }
       },
       "reauth_confirm": {
@@ -54,6 +64,7 @@
       "no_data": "Das Portal hat für diesen Zähler keine Messwerte geliefert. Prüfe Zählernummer, OBIS-Code und Export-Typ.",
       "required": "Dieses Feld ist erforderlich.",
       "invalid_unit": "Diese Einheit passt nicht zum gewählten Zählertyp.",
+      "price_required": "Ein Winterpreis braucht auch einen Grundpreis.",
       "unknown": "Unerwarteter Fehler. Details stehen im Home-Assistant-Log."
     },
     "abort": {
@@ -72,40 +83,39 @@
           "settings": "Abruf- und Login-Einstellungen"
         }
       },
-      "add_meter": {
-        "title": "Zähler hinzufügen",
+      "meter_type": {
+        "title": "Was misst der Zähler?",
+        "description": "Einheit und Preise auf dem nächsten Schritt richten sich danach. Strom und Wasser sind getestet, Gas und Fernwärme nicht - Rückmeldungen dazu sind willkommen.",
+        "data": {
+          "meter_type": "Typ"
+        }
+      },
+      "meter_details": {
+        "title": "Zähler",
+        "description": "Preise sind optional und werden in {currency} pro {unit} angegeben. Trägst du einen ein, importiert die Integration zusätzlich eine Statistik mit den Kosten, die das Energy Dashboard als \"Statistik, die die Gesamtkosten erfasst\" akzeptiert.\n\nRegio Energie verrechnet Strom von April bis September günstiger und von Oktober bis März teurer - trag beide Preise ein. Bei Wasser genügt der erste Preis; rechne dafür Wasser- und Abwasserpreis zusammen, das ergibt den echten Preis pro m³.\n\nEin neuer Name lässt die bisherigen Statistiken unangetastet.",
         "data": {
           "name": "Name",
-          "meter_type": "Typ",
           "meter_number": "Zählernummer",
           "unit": "Einheit",
           "obis_code": "OBIS-Code",
-          "export_type": "Export-Typ"
+          "export_type": "Export-Typ",
+          "price": "Preis pro Einheit (optional)",
+          "price_winter": "Winterpreis, Oktober bis März (optional)"
         },
         "data_description": {
           "name": "Wird als Name der Statistik verwendet, z. B. Strom oder Wasser.",
-          "meter_number": "Die Zählernummer aus dem Portal.",
+          "meter_number": "Steht im Portal unter Lastgang, auf okp.regioenergie.ch unter /de/services/lastgang.php.",
           "unit": "Muss der Einheit entsprechen, die das Portal exportiert.",
           "obis_code": "1-1:1.29.0 belassen, solange das Portal keinen anderen Code verwendet.",
-          "export_type": "WirkBezug belassen, solange das Portal keinen anderen Typ verwendet."
+          "export_type": "WirkBezug belassen, solange das Portal keinen anderen Typ verwendet.",
+          "price": "Gilt ganzjährig, solange kein Winterpreis gesetzt ist.",
+          "price_winter": "Leer lassen, wenn der Preis das ganze Jahr gleich ist."
         }
       },
       "edit_meter": {
         "title": "Zähler bearbeiten",
         "data": {
           "statistic_id": "Zähler"
-        }
-      },
-      "meter_details": {
-        "title": "Zähler bearbeiten",
-        "description": "Ein neuer Name verschiebt die bisherige Historie nicht: die Statistik bleibt {statistic_id}.",
-        "data": {
-          "name": "Name",
-          "meter_type": "Typ",
-          "meter_number": "Zählernummer",
-          "unit": "Einheit",
-          "obis_code": "OBIS-Code",
-          "export_type": "Export-Typ"
         }
       },
       "remove_meter": {
@@ -139,6 +149,7 @@
       "no_data": "Das Portal hat für diesen Zähler keine Messwerte geliefert. Prüfe Zählernummer, OBIS-Code und Export-Typ.",
       "required": "Dieses Feld ist erforderlich.",
       "invalid_unit": "Diese Einheit passt nicht zum gewählten Zählertyp.",
+      "price_required": "Ein Winterpreis braucht auch einen Grundpreis.",
       "unknown": "Unerwarteter Fehler. Details stehen im Home-Assistant-Log."
     }
   },
@@ -146,9 +157,9 @@
     "meter_type": {
       "options": {
         "electricity": "Strom",
-        "gas": "Gas",
+        "gas": "Gas (ungetestet)",
         "water": "Wasser",
-        "heat": "Fernwärme"
+        "heat": "Fernwärme (ungetestet)"
       }
     }
   }

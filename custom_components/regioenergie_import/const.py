@@ -25,6 +25,14 @@ CONF_OBIS_CODE: Final = "obis_code"
 CONF_EXPORT_TYPE: Final = "export_type"
 CONF_UNIT: Final = "unit"
 CONF_STATISTIC_ID: Final = "statistic_id"
+CONF_COST_STATISTIC_ID: Final = "cost_statistic_id"
+CONF_PRICE: Final = "price"
+CONF_PRICE_WINTER: Final = "price_winter"
+
+# Regio Energie bills electricity at a lower rate in the summer half year and a
+# higher one in the winter half year. A meter with only a base price keeps that
+# price all year.
+SUMMER_MONTHS: Final = frozenset({4, 5, 6, 7, 8, 9})
 
 # --- Portal --------------------------------------------------------------- #
 DEFAULT_BASE_URL: Final = "https://okp.regioenergie.ch"
