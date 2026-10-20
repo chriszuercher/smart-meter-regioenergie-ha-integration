@@ -15,7 +15,8 @@ CONF_LOGIN_URL: Final = "login_url"
 CONF_USERNAME_FIELD: Final = "username_field"
 CONF_PASSWORD_FIELD: Final = "password_field"
 CONF_DAYS_TO_FETCH: Final = "days_to_fetch"
-CONF_SCAN_INTERVAL_HOURS: Final = "scan_interval_hours"
+CONF_SCAN_INTERVAL_MINUTES: Final = "scan_interval_minutes"
+CONF_HISTORY_DAYS: Final = "history_days"
 CONF_METERS: Final = "meters"
 
 # --- Per meter keys ---------------------------------------------------------
@@ -27,11 +28,15 @@ CONF_UNIT: Final = "unit"
 CONF_STATISTIC_ID: Final = "statistic_id"
 CONF_COST_STATISTIC_ID: Final = "cost_statistic_id"
 CONF_PRICE: Final = "price"
+CONF_PRICES: Final = "prices"
+CONF_VALID_FROM: Final = "valid_from"
+
+# --- Keys of config entry version 1, only read by the migration ------------
+CONF_SCAN_INTERVAL_HOURS: Final = "scan_interval_hours"
 CONF_PRICE_WINTER: Final = "price_winter"
 
-# Regio Energie bills electricity at a lower rate in the summer half year and a
-# higher one in the winter half year. A meter with only a base price keeps that
-# price all year.
+# Version 1 billed a winter price from October to March and the base price
+# from April to September.
 SUMMER_MONTHS: Final = frozenset({4, 5, 6, 7, 8, 9})
 
 # --- Portal --------------------------------------------------------------- #
@@ -65,12 +70,29 @@ INTERVAL_END_OFFSET: Final = timedelta(minutes=15)
 DEFAULT_OBIS_CODE: Final = "1-1:1.29.0"
 DEFAULT_EXPORT_TYPE: Final = "WirkBezug"
 DEFAULT_DAYS_TO_FETCH: Final = 7
-DEFAULT_SCAN_INTERVAL_HOURS: Final = 6
+DEFAULT_SCAN_INTERVAL_MINUTES: Final = 60
+DEFAULT_HISTORY_DAYS: Final = 730
 
 MIN_DAYS_TO_FETCH: Final = 1
 MAX_DAYS_TO_FETCH: Final = 365
-MIN_SCAN_INTERVAL_HOURS: Final = 1
-MAX_SCAN_INTERVAL_HOURS: Final = 24
+MIN_SCAN_INTERVAL_MINUTES: Final = 15
+MAX_SCAN_INTERVAL_MINUTES: Final = 1440
+MIN_HISTORY_DAYS: Final = 0
+MAX_HISTORY_DAYS: Final = 1095
+
+# The portal publishes new values every 15 minutes, so a regular poll only
+# reads the last few days. Once a day, on the first poll after this local hour,
+# the full `days_to_fetch` window is read to pick up corrections.
+RECENT_DAYS_TO_FETCH: Final = 2
+CORRECTION_HOUR: Final = 3
+
+# The history of a new meter is fetched in chunks of this many days, oldest
+# first, so no single request has to cover years of quarter hours.
+HISTORY_CHUNK_DAYS: Final = 31
+
+# Consecutive failed polls of one meter before a repair issue is raised, so a
+# short outage of the portal does not nag.
+FAILURES_BEFORE_ISSUE: Final = 3
 
 # --- Meter types ----------------------------------------------------------- #
 METER_TYPE_ELECTRICITY: Final = "electricity"

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from html.parser import HTMLParser
 from urllib.parse import urlencode, urljoin
 from zoneinfo import ZoneInfo
@@ -48,7 +48,11 @@ class RegioEnergieAuthError(RegioEnergieError):
 
 @dataclass(slots=True)
 class MeterReading:
-    """A single value of the load profile export, at the interval *end*."""
+    """A single value of the load profile export, at the interval *end*.
+
+    The timestamp is in UTC: Swiss local time repeats an hour every autumn, so
+    only UTC keeps every quarter hour apart.
+    """
 
     timestamp: datetime
     value: float
@@ -145,8 +149,15 @@ def extract_login_form(html: str) -> LoginForm | None:
 
 def looks_like_html(text: str) -> bool:
     """Return True if the body is a web page rather than a CSV export."""
-    head = text.lstrip()[:512].lower()
-    return head.startswith(("<!doctype", "<html", "<?xml", "<"))
+    return text.lstrip().startswith("<")
+
+
+def _is_ambiguous(naive: datetime, tzinfo: ZoneInfo) -> bool:
+    """Return True for a wall time that occurs twice (autumn DST change)."""
+    return (
+        naive.replace(tzinfo=tzinfo, fold=0).utcoffset()
+        != naive.replace(tzinfo=tzinfo, fold=1).utcoffset()
+    )
 
 
 def parse_csv(text: str, timezone: str = PORTAL_TIMEZONE) -> list[MeterReading]:
@@ -155,9 +166,16 @@ def parse_csv(text: str, timezone: str = PORTAL_TIMEZONE) -> list[MeterReading]:
     Format: `;` separated, `Datum;Zeit;Wert`, German date format, one header
     line containing "Datum". Ported from the original cron script, including
     its tolerance for empty and malformed rows.
+
+    The timestamps are Swiss local time. When the clocks go back in autumn the
+    export runs through the hour after 02:00 twice; the second pass is
+    recognised by the time jumping backwards and gets `fold=1`, so both passes
+    keep their own UTC time.
     """
     tzinfo = ZoneInfo(timezone)
     readings: list[MeterReading] = []
+    previous: datetime | None = None
+    fold = 0
 
     for line in text.strip().splitlines():
         parts = line.split(";")
@@ -180,11 +198,20 @@ def parse_csv(text: str, timezone: str = PORTAL_TIMEZONE) -> list[MeterReading]:
         stamp = f"{parts[0].strip()} {parts[1].strip()}"
         for time_format in _TIME_FORMATS:
             try:
-                timestamp = datetime.strptime(stamp, time_format)
+                naive = datetime.strptime(stamp, time_format)
             except ValueError:
                 continue
+            if not _is_ambiguous(naive, tzinfo):
+                fold = 0
+            elif previous is not None and naive < previous:
+                fold = 1
+            previous = naive
             readings.append(
-                MeterReading(timestamp.replace(tzinfo=tzinfo), value, is_empty)
+                MeterReading(
+                    naive.replace(tzinfo=tzinfo, fold=fold).astimezone(UTC),
+                    value,
+                    is_empty,
+                )
             )
             break
 
@@ -372,8 +399,11 @@ class RegioEnergieClient:
         except TimeoutError as err:
             raise RegioEnergieConnectionError("Login request timed out") from err
 
-        # Still looking at a password field means the portal bounced us back.
-        if extract_login_form(body) is not None:
+        # The same password field again means the portal bounced us back. A
+        # form with another password field (e.g. "change password" on the
+        # page behind the login) is not a rejection.
+        answer = extract_login_form(body)
+        if answer is not None and answer.password_field == password_field:
             raise RegioEnergieAuthError("Portal rejected the credentials")
 
         self._logged_in = True

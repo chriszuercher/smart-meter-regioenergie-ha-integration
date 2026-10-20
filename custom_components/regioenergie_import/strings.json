@@ -22,22 +22,21 @@
       },
       "meter_type": {
         "title": "What does the meter measure?",
-        "description": "The unit and the prices on the next screen follow from this. Electricity and water are tested; gas and district heating are not - please report back if they work for you.",
+        "description": "The unit and the price on the next screen follow from this. Electricity and water are tested; gas and district heating are not - please report back if they work for you.",
         "data": {
           "meter_type": "Type"
         }
       },
       "meter_details": {
         "title": "Add meter",
-        "description": "Prices are optional and are given in {currency} per {unit}. Enter one and the integration imports a second statistic with the costs, which the energy dashboard accepts as \"a statistic tracking total costs\".\n\nRegio Energie bills electricity at a lower rate from April to September and a higher one from October to March - enter both. For water enter only the first price, and add the water and the wastewater price together to get the real price per m³.",
+        "description": "The price is optional and given in {currency} per {unit}. Enter one and the integration imports a second statistic with the costs, which the energy dashboard accepts as \"a statistic tracking total costs\". For water, add the water and the wastewater price together.\n\nAfter setup, up to two years of history are imported in the background.",
         "data": {
           "name": "Name",
           "meter_number": "Meter number",
           "unit": "Unit",
           "obis_code": "OBIS code",
           "export_type": "Export type",
-          "price": "Price per unit (optional)",
-          "price_winter": "Winter price, October to March (optional)"
+          "price": "Current price per unit (optional)"
         },
         "data_description": {
           "name": "Used for the statistic name, e.g. Electricity or Water.",
@@ -45,8 +44,7 @@
           "unit": "Must match the unit the portal exports.",
           "obis_code": "Leave at 1-1:1.29.0 unless the portal uses a different code.",
           "export_type": "Leave at WirkBezug unless the portal uses a different one.",
-          "price": "Applies all year unless a winter price is set.",
-          "price_winter": "Leave empty if the price is the same all year."
+          "price": "Also prices the imported history. Price changes per month are added afterwards under Configure > Prices."
         }
       },
       "reauth_confirm": {
@@ -56,20 +54,40 @@
           "username": "Username",
           "password": "Password"
         }
+      },
+      "reconfigure": {
+        "title": "Portal account",
+        "description": "Change the portal address, the account or the login details. The meters and their statistics stay as they are.",
+        "data": {
+          "base_url": "Portal address",
+          "username": "Username",
+          "password": "Password",
+          "login_url": "Login page (optional)",
+          "username_field": "Username form field (optional)",
+          "password_field": "Password form field (optional)"
+        },
+        "data_description": {
+          "base_url": "For customers of Regio Energie Solothurn: https://okp.regioenergie.ch",
+          "username": "On okp.regioenergie.ch this is the e-mail address you sign in with.",
+          "login_url": "Full address of the login page, if it is not found automatically.",
+          "username_field": "Name of the username input in the login form.",
+          "password_field": "Name of the password input in the login form."
+        }
       }
     },
     "error": {
       "cannot_connect": "The portal could not be reached.",
-      "invalid_auth": "The portal rejected these credentials, or the login form could not be found. Fill in the advanced login fields to point the integration at the right form.",
       "no_data": "The portal returned no readings for this meter. Check the meter number, the OBIS code and the export type.",
       "required": "This field is required.",
       "invalid_unit": "This unit does not fit the selected meter type.",
-      "price_required": "A winter price needs a base price as well.",
-      "unknown": "Unexpected error. Check the Home Assistant log for details."
+      "unknown": "Unexpected error. Check the Home Assistant log for details.",
+      "invalid_auth": "The portal rejected these credentials, or the login form could not be found. Fill in the advanced login fields to point the integration at the right form."
     },
     "abort": {
       "already_configured": "This account is already set up.",
-      "reauth_successful": "Signed in again successfully."
+      "reauth_successful": "Signed in again successfully.",
+      "reconfigure_successful": "The account was updated.",
+      "unique_id_mismatch": "This is a different account. Add it as a new integration entry instead."
     }
   },
   "options": {
@@ -79,28 +97,28 @@
         "menu_options": {
           "add_meter": "Add meter",
           "edit_meter": "Edit meter",
+          "prices": "Prices",
           "remove_meter": "Remove meter",
-          "settings": "Polling and login settings"
+          "settings": "Polling, history and login"
         }
       },
       "meter_type": {
         "title": "What does the meter measure?",
-        "description": "The unit and the prices on the next screen follow from this. Electricity and water are tested; gas and district heating are not - please report back if they work for you.",
+        "description": "The unit and the price on the next screen follow from this. Electricity and water are tested; gas and district heating are not - please report back if they work for you.",
         "data": {
           "meter_type": "Type"
         }
       },
       "meter_details": {
         "title": "Meter",
-        "description": "Prices are optional and are given in {currency} per {unit}. Enter one and the integration imports a second statistic with the costs, which the energy dashboard accepts as \"a statistic tracking total costs\".\n\nRegio Energie bills electricity at a lower rate from April to September and a higher one from October to March - enter both. For water enter only the first price, and add the water and the wastewater price together to get the real price per m³.\n\nRenaming a meter keeps its statistics where they are.",
+        "description": "The price is optional and given in {currency} per {unit}; prices that change over time are managed under Prices. A new meter gets its history imported in the background.\n\nRenaming a meter keeps its statistics where they are. The unit of an existing meter cannot be changed, because its history is stored in it.",
         "data": {
           "name": "Name",
           "meter_number": "Meter number",
           "unit": "Unit",
           "obis_code": "OBIS code",
           "export_type": "Export type",
-          "price": "Price per unit (optional)",
-          "price_winter": "Winter price, October to March (optional)"
+          "price": "Current price per unit (optional)"
         },
         "data_description": {
           "name": "Used for the statistic name, e.g. Electricity or Water.",
@@ -108,8 +126,7 @@
           "unit": "Must match the unit the portal exports.",
           "obis_code": "Leave at 1-1:1.29.0 unless the portal uses a different code.",
           "export_type": "Leave at WirkBezug unless the portal uses a different one.",
-          "price": "Applies all year unless a winter price is set.",
-          "price_winter": "Leave empty if the price is the same all year."
+          "price": "Also prices the imported history. Price changes per month are added afterwards under Configure > Prices."
         }
       },
       "edit_meter": {
@@ -118,25 +135,64 @@
           "statistic_id": "Meter"
         }
       },
+      "prices": {
+        "title": "Prices",
+        "description": "Pick the meter whose prices you want to change.",
+        "data": {
+          "statistic_id": "Meter"
+        }
+      },
+      "price_menu": {
+        "title": "Prices of {meter}",
+        "description": "Each price applies from its month on, until the next entry. Months before the first entry use the first price.\n\n{schedule}\n\nChanges are applied with \"Save\"; the cost history is then re-priced from the first changed month on.",
+        "menu_options": {
+          "price_add": "Add price",
+          "price_remove": "Remove prices",
+          "price_save": "Save"
+        }
+      },
+      "price_add": {
+        "title": "Add price",
+        "description": "Price in {unit_label}. An entry for the same month is replaced.",
+        "data": {
+          "valid_from": "Valid from",
+          "price": "Price per unit"
+        },
+        "data_description": {
+          "valid_from": "Only the month counts; the price applies from the first of that month."
+        }
+      },
+      "price_remove": {
+        "title": "Remove prices",
+        "data": {
+          "entries": "Entries to remove"
+        }
+      },
       "remove_meter": {
         "title": "Remove meter",
-        "description": "Removed meters are no longer polled. Their statistics stay in Home Assistant and can be deleted under Developer tools > Statistics.",
+        "description": "Removed meters are no longer polled.",
         "data": {
-          "meters": "Meters to remove"
+          "meters": "Meters to remove",
+          "delete_history": "Also delete their statistics"
+        },
+        "data_description": {
+          "delete_history": "Removes the consumption and cost history of these meters from Home Assistant. This cannot be undone."
         }
       },
       "settings": {
-        "title": "Polling and login settings",
+        "title": "Polling, history and login",
         "data": {
-          "days_to_fetch": "Days per poll",
-          "scan_interval_hours": "Poll interval (hours)",
+          "scan_interval_minutes": "Poll interval (minutes)",
+          "days_to_fetch": "Days for the daily correction",
+          "history_days": "History of new meters (days)",
           "login_url": "Login page (optional)",
           "username_field": "Username form field (optional)",
           "password_field": "Password form field (optional)"
         },
         "data_description": {
-          "days_to_fetch": "How far back each poll reads. The overlap picks up values the utility corrects afterwards.",
-          "scan_interval_hours": "The portal usually publishes new data once a day.",
+          "scan_interval_minutes": "The portal publishes new values every 15 minutes. Each poll reads the last two days.",
+          "days_to_fetch": "Once a day this many days are read again, to pick up values the utility corrects afterwards.",
+          "history_days": "How far back a newly added meter is imported. 0 imports no history.",
           "login_url": "Full address of the login page, if it is not found automatically.",
           "username_field": "Name of the username input in the login form.",
           "password_field": "Name of the password input in the login form."
@@ -145,12 +201,48 @@
     },
     "error": {
       "cannot_connect": "The portal could not be reached.",
-      "invalid_auth": "The portal rejected the stored credentials, or the login form could not be found.",
       "no_data": "The portal returned no readings for this meter. Check the meter number, the OBIS code and the export type.",
       "required": "This field is required.",
       "invalid_unit": "This unit does not fit the selected meter type.",
-      "price_required": "A winter price needs a base price as well.",
-      "unknown": "Unexpected error. Check the Home Assistant log for details."
+      "unknown": "Unexpected error. Check the Home Assistant log for details.",
+      "invalid_auth": "The portal rejected the stored credentials, or the login form could not be found."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "price": {
+        "name": "{meter} price"
+      }
+    }
+  },
+  "issues": {
+    "meter_failed": {
+      "title": "Import of {name} keeps failing",
+      "description": "The last polls could not import {name}: {error}\n\nCheck the meter under the integration options. This message disappears once an import succeeds again."
+    }
+  },
+  "exceptions": {
+    "unknown_meter": {
+      "message": "No loaded meter has the statistic id {statistic_id}."
+    },
+    "backfill_running": {
+      "message": "The history of {statistic_id} is already being imported."
+    }
+  },
+  "services": {
+    "import_history": {
+      "name": "Import history",
+      "description": "Imports the history of a meter from a start date up to now, in the background.",
+      "fields": {
+        "statistic_id": {
+          "name": "Statistic id",
+          "description": "The consumption statistic of the meter, e.g. regioenergie_import:electricity_import."
+        },
+        "start": {
+          "name": "Start",
+          "description": "First day to import."
+        }
+      }
     }
   },
   "selector": {

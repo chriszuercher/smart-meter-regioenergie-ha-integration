@@ -1,0 +1,14 @@
+{
+  "entity": {
+    "sensor": {
+      "price": {
+        "default": "mdi:cash"
+      }
+    }
+  },
+  "services": {
+    "import_history": {
+      "service": "mdi:history"
+    }
+  }
+}

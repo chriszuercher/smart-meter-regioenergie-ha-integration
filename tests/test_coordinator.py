@@ -1,6 +1,6 @@
 """Tests for the hourly aggregation and the statistics import."""
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -13,9 +13,10 @@ from custom_components.regioenergie_import.const import (
     CONF_METER_NUMBER,
     CONF_OBIS_CODE,
     CONF_PRICE,
-    CONF_PRICE_WINTER,
+    CONF_PRICES,
     CONF_STATISTIC_ID,
     CONF_UNIT,
+    CONF_VALID_FROM,
 )
 from custom_components.regioenergie_import.coordinator import (
     RegioEnergieCoordinator,
@@ -23,7 +24,9 @@ from custom_components.regioenergie_import.coordinator import (
     build_metadata,
     cost_statistic_id_for,
     drop_unpublished_tail,
+    first_repriced_month,
     price_at,
+    price_for_month,
 )
 
 ZURICH = ZoneInfo("Europe/Zurich")
@@ -59,6 +62,16 @@ class FakeClient:
     async def async_fetch_readings(self, number, obis, export_type, start, end):
         self.calls.append((number, obis, export_type, start, end))
         return self.readings
+
+
+class FakeStore:
+    """Keep the saved import state in memory."""
+
+    def __init__(self) -> None:
+        self.saved = None
+
+    async def async_save(self, data) -> None:
+        self.saved = data
 
 
 class FakeRecorder:
@@ -97,7 +110,17 @@ def make_coordinator(client) -> RegioEnergieCoordinator:
     instance.hass = FakeHass()
     instance.client = client
     instance._timezone = ZURICH
+    instance._has_history = set()
+    instance._backfilling = set()
+    instance._state = {"prices": {}, "pending_history": {}}
+    instance._store = FakeStore()
+    instance.backfill_status = {}
     return instance
+
+
+def schedule(*entries: tuple[str, float]) -> list[dict]:
+    """Build a price schedule from (month, price) pairs."""
+    return [{CONF_VALID_FROM: month, CONF_PRICE: price} for month, price in entries]
 
 
 def stub_statistics(rows_by_window):
@@ -145,7 +168,7 @@ def test_hourly_grouping_works_for_hourly_exports() -> None:
 
 
 def test_duplicate_timestamps_are_added_up() -> None:
-    """Repeated local times (autumn DST) keep their total consumption."""
+    """Two rows for the very same quarter hour keep their total consumption."""
     totals = build_hourly_totals([reading(2, 15, 1.0), reading(2, 15, 2.0)])
 
     assert totals == {datetime(2026, 8, 13, 2, 0, tzinfo=ZURICH): 3.0}
@@ -321,29 +344,73 @@ def test_a_meter_without_a_price_has_no_cost() -> None:
 
 
 def test_a_single_price_applies_all_year() -> None:
-    """Without a winter price the base price holds in every month."""
-    meter = {**METER, CONF_PRICE: 2.5}
+    """One entry prices every month, before and after it."""
+    meter = {**METER, CONF_PRICES: schedule(("2026-06", 2.5))}
 
-    assert price_at(meter, datetime(2026, 1, 15, tzinfo=ZURICH)) == 2.5
+    assert price_at(meter, datetime(2024, 1, 15, tzinfo=ZURICH)) == 2.5
     assert price_at(meter, datetime(2026, 7, 15, tzinfo=ZURICH)) == 2.5
 
 
 @pytest.mark.parametrize(
     ("month", "expected"),
     [
-        (3, 0.30),  # March still winter
-        (4, 0.20),  # April starts the summer rate
-        (9, 0.20),  # September is the last summer month
-        (10, 0.30),  # October back to winter
+        ("2025-12", 0.25),  # before the first entry: the first price
+        ("2026-01", 0.25),
+        ("2026-02", 0.25),  # carried over from January
+        ("2026-04", 0.25),
+        ("2026-05", 0.30),
+        ("2027-03", 0.30),  # still the last entry
     ],
 )
-def test_seasonal_price_switches_in_april_and_october(
-    month: int, expected: float
-) -> None:
-    """Summer runs April to September, the rest of the year is dearer."""
-    meter = {**METER, CONF_PRICE: 0.20, CONF_PRICE_WINTER: 0.30}
+def test_prices_carry_over_until_the_next_entry(month: str, expected: float) -> None:
+    """A price holds from its month until the month of the next entry."""
+    prices = schedule(("2026-05", 0.30), ("2026-01", 0.25))
 
-    assert price_at(meter, datetime(2026, month, 15, tzinfo=ZURICH)) == expected
+    assert price_for_month(prices, month) == expected
+
+
+def test_the_month_is_taken_in_swiss_time() -> None:
+    """The first hour of May in Zurich is still April in UTC."""
+    meter = {**METER, CONF_PRICES: schedule(("2026-04", 1.0), ("2026-05", 2.0))}
+
+    assert price_at(meter, datetime(2026, 4, 30, 22, 0, tzinfo=UTC)) == 2.0
+
+
+def test_unchanged_prices_need_no_repricing() -> None:
+    """Same schedule, nothing to do."""
+    prices = schedule(("2026-01", 0.25))
+
+    assert first_repriced_month(prices, list(prices)) is None
+
+
+def test_a_new_entry_reprices_from_its_month() -> None:
+    """Adding a price for May changes the months from May on."""
+    old = schedule(("2026-01", 0.25))
+    new = schedule(("2026-01", 0.25), ("2026-05", 0.30))
+
+    assert first_repriced_month(old, new) == "2026-05"
+
+
+def test_a_changed_first_price_reprices_everything() -> None:
+    """The first price also covers the months before it."""
+    old = schedule(("2026-01", 0.25))
+    new = schedule(("2026-01", 0.27))
+
+    assert first_repriced_month(old, new) == "0000-01"
+
+
+def test_a_redundant_entry_reprices_nothing() -> None:
+    """An entry that repeats the price before it changes no month."""
+    old = schedule(("2026-01", 0.25))
+    new = schedule(("2026-01", 0.25), ("2026-03", 0.25))
+
+    assert first_repriced_month(old, new) is None
+
+
+def test_a_first_price_prices_the_whole_history() -> None:
+    """A meter without prices so far gets its cost from the beginning."""
+    assert first_repriced_month([], schedule(("2026-01", 0.25))) == "0000-01"
+    assert first_repriced_month(schedule(("2026-01", 0.25)), []) is None
 
 
 @pytest.mark.asyncio
@@ -356,7 +423,7 @@ async def test_cost_statistic_is_imported_next_to_consumption(
     )
     meter = {
         **METER,
-        CONF_PRICE: 2.0,
+        CONF_PRICES: schedule(("2026-01", 2.0)),
         CONF_COST_STATISTIC_ID: "regioenergie_import:water_cost",
     }
     instance = make_coordinator(FakeClient([reading(1, 15, 1.5), reading(2, 15, 2.5)]))
@@ -385,7 +452,7 @@ async def test_cost_uses_the_price_of_each_hour(imported, monkeypatch) -> None:
     monkeypatch.setattr(
         coordinator_module, "statistics_during_period", stub_statistics({})
     )
-    meter = {**METER, CONF_PRICE: 0.20, CONF_PRICE_WINTER: 0.30}
+    meter = {**METER, CONF_PRICES: schedule(("2026-04", 0.20), ("2026-10", 0.30))}
     instance = make_coordinator(
         FakeClient(
             [
@@ -419,7 +486,7 @@ async def test_cost_continues_its_own_running_total(imported, monkeypatch) -> No
             else {}
         ),
     )
-    meter = {**METER, CONF_PRICE: 2.0}
+    meter = {**METER, CONF_PRICES: schedule(("2026-01", 2.0))}
     instance = make_coordinator(FakeClient([reading(1, 15, 1.5)]))
 
     await instance._async_import_meter(meter, date(2026, 8, 6), date(2026, 8, 13), NOW)
@@ -442,3 +509,70 @@ def test_metadata_is_accepted_by_the_recorder_schema(unit: str) -> None:
     assert metadata["source"] == "regioenergie_import"
     # Raises TypeError if a key is not a column of the statistics metadata.
     StatisticsMeta(**metadata)
+
+
+# --- daylight saving time --------------------------------------------------
+
+
+def quarter_hours(day: str, times: list[str], value: float = 1.0) -> str:
+    """Build an export with one row per given local time."""
+    return "Datum;Zeit;Wert;\n" + "".join(f"{day};{t};{value};\n" for t in times)
+
+
+def all_quarter_hours(hours: list[int]) -> list[str]:
+    """Return the interval end times of whole local hours, as the export has them."""
+    times = []
+    for hour in hours:
+        times += [f"{hour:02d}:15", f"{hour:02d}:30", f"{hour:02d}:45"]
+        times.append(f"{hour + 1:02d}:00")
+    return times
+
+
+def test_the_repeated_autumn_hour_keeps_both_passes() -> None:
+    """On 25 Oct 2026 the hour after 02:00 runs twice; both are their own hour."""
+    # 01:00-02:00, then 02:00-03:00 in summer time, the same wall times again
+    # in winter time, then 03:00-04:00.
+    times = (
+        all_quarter_hours([1])
+        + all_quarter_hours([2])[:3]
+        + ["02:00"]  # 03:00 summer time is 02:00 winter time
+        + all_quarter_hours([2])[:3]
+        + ["03:00"]
+        + all_quarter_hours([3])
+    )
+    readings = parse_csv(quarter_hours("25.10.2026", times))
+
+    totals = build_hourly_totals(readings)
+
+    assert len({r.timestamp for r in readings}) == len(readings) == 16
+    assert sorted(totals) == [
+        datetime(2026, 10, 24, 23, 0, tzinfo=UTC),  # 01:00 summer time
+        datetime(2026, 10, 25, 0, 0, tzinfo=UTC),  # 02:00 summer time
+        datetime(2026, 10, 25, 1, 0, tzinfo=UTC),  # 02:00 winter time
+        datetime(2026, 10, 25, 2, 0, tzinfo=UTC),  # 03:00 winter time
+    ]
+    assert sum(totals.values()) == 16.0
+    assert set(totals.values()) == {4.0}
+
+
+def test_the_skipped_spring_hour_does_not_collide() -> None:
+    """On 29 Mar 2026 02:00 does not exist; 03:00 ends the hour 01:00."""
+    times = [*all_quarter_hours([0, 1])[:-1], "03:00", *all_quarter_hours([3])]
+    readings = parse_csv(quarter_hours("29.03.2026", times))
+
+    totals = build_hourly_totals(readings)
+
+    assert sorted(totals) == [
+        datetime(2026, 3, 28, 23, 0, tzinfo=UTC),  # 00:00 winter time
+        datetime(2026, 3, 29, 0, 0, tzinfo=UTC),  # 01:00 winter time
+        datetime(2026, 3, 29, 1, 0, tzinfo=UTC),  # 03:00 summer time
+    ]
+    assert set(totals.values()) == {4.0}
+
+
+def test_readings_are_stored_in_utc() -> None:
+    """Every timestamp leaves the parser in UTC."""
+    (reading_,) = parse_csv("Datum;Zeit;Wert\n13.08.2026;12:15;1.0\n")
+
+    assert reading_.timestamp.tzinfo is UTC
+    assert reading_.timestamp == datetime(2026, 8, 13, 10, 15, tzinfo=UTC)

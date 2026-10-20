@@ -1,5 +1,7 @@
 """Tests for the statistic id generation and the meter form validation."""
 
+from datetime import date
+
 import pytest
 
 from custom_components.regioenergie_import.config_flow import (
@@ -7,6 +9,9 @@ from custom_components.regioenergie_import.config_flow import (
     _validate_meter_input,
     assign_statistic_ids,
     build_statistic_id,
+    format_schedule,
+    new_meter,
+    set_price,
 )
 from custom_components.regioenergie_import.const import (
     CONF_COST_STATISTIC_ID,
@@ -14,9 +19,10 @@ from custom_components.regioenergie_import.const import (
     CONF_METER_TYPE,
     CONF_OBIS_CODE,
     CONF_PRICE,
-    CONF_PRICE_WINTER,
+    CONF_PRICES,
     CONF_STATISTIC_ID,
     CONF_UNIT,
+    CONF_VALID_FROM,
     DEFAULT_OBIS_CODE,
     DEFAULT_UNIT_BY_METER_TYPE,
 )
@@ -140,24 +146,46 @@ def test_a_price_can_be_cleared_again() -> None:
     assert CONF_PRICE not in submitted
 
 
-def test_a_winter_price_needs_a_base_price() -> None:
-    """The winter price is the exception, not the only price."""
-    errors = _validate_meter_input({**VALID_METER, CONF_PRICE_WINTER: 0.30})
+def test_the_unit_of_an_existing_meter_is_not_offered() -> None:
+    """Changing the unit would mix two units in one history."""
+    schema = _meter_details_schema("water", VALID_METER, editing=True)
 
-    assert errors == {CONF_PRICE: "price_required"}
+    keys = {str(key) for key in schema.schema}
+    assert CONF_UNIT not in keys
+    assert CONF_PRICE not in keys  # prices are managed on their own
 
 
-def test_both_prices_together_are_valid() -> None:
-    """The seasonal pair is what an electricity meter normally gets."""
-    meter = {
-        **VALID_METER,
-        CONF_METER_TYPE: "electricity",
-        CONF_UNIT: "kWh",
-        CONF_PRICE: 0.20,
-        CONF_PRICE_WINTER: 0.30,
-    }
+def test_the_price_of_a_new_meter_starts_its_schedule() -> None:
+    """The price box becomes the first entry of the schedule."""
+    meter = new_meter({**VALID_METER, CONF_PRICE: 2.5}, date(2026, 10, 20))
 
-    assert _validate_meter_input(meter) == {}
+    assert CONF_PRICE not in meter
+    assert meter[CONF_PRICES] == [{CONF_VALID_FROM: "2026-10", CONF_PRICE: 2.5}]
+
+
+def test_a_new_meter_without_price_has_no_schedule() -> None:
+    """No price, no cost statistic."""
+    assert CONF_PRICES not in new_meter(dict(VALID_METER), date(2026, 10, 20))
+
+
+def test_a_price_for_the_same_month_replaces_the_old_one() -> None:
+    """One entry per month, kept in order."""
+    prices = [
+        {CONF_VALID_FROM: "2026-05", CONF_PRICE: 0.30},
+        {CONF_VALID_FROM: "2026-01", CONF_PRICE: 0.25},
+    ]
+
+    prices = set_price(prices, "2026-05", 0.31)
+    prices = set_price(prices, "2025-10", 0.20)
+
+    assert prices == [
+        {CONF_VALID_FROM: "2025-10", CONF_PRICE: 0.20},
+        {CONF_VALID_FROM: "2026-01", CONF_PRICE: 0.25},
+        {CONF_VALID_FROM: "2026-05", CONF_PRICE: 0.31},
+    ]
+    assert format_schedule(prices, "CHF/kWh").splitlines()[0] == (
+        "- 2025-10: 0.2 CHF/kWh"
+    )
 
 
 def test_a_new_meter_gets_both_statistic_ids() -> None:

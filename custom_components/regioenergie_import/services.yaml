@@ -1,0 +1,11 @@
+import_history:
+  fields:
+    statistic_id:
+      required: true
+      example: "regioenergie_import:electricity_import"
+      selector:
+        text:
+    start:
+      required: true
+      selector:
+        date:

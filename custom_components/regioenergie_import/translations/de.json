@@ -22,22 +22,21 @@
       },
       "meter_type": {
         "title": "Was misst der Zähler?",
-        "description": "Einheit und Preise auf dem nächsten Schritt richten sich danach. Strom und Wasser sind getestet, Gas und Fernwärme nicht - Rückmeldungen dazu sind willkommen.",
+        "description": "Einheit und Preis auf dem nächsten Schritt richten sich danach. Strom und Wasser sind getestet, Gas und Fernwärme nicht - Rückmeldungen dazu sind willkommen.",
         "data": {
           "meter_type": "Typ"
         }
       },
       "meter_details": {
         "title": "Zähler hinzufügen",
-        "description": "Preise sind optional und werden in {currency} pro {unit} angegeben. Trägst du einen ein, importiert die Integration zusätzlich eine Statistik mit den Kosten, die das Energy Dashboard als \"Statistik, die die Gesamtkosten erfasst\" akzeptiert.\n\nRegio Energie verrechnet Strom von April bis September günstiger und von Oktober bis März teurer - trag beide Preise ein. Bei Wasser genügt der erste Preis; rechne dafür Wasser- und Abwasserpreis zusammen, das ergibt den echten Preis pro m³.",
+        "description": "Der Preis ist optional und wird in {currency} pro {unit} angegeben. Trägst du einen ein, importiert die Integration zusätzlich eine Statistik mit den Kosten, die das Energy Dashboard als \"Statistik, die die Gesamtkosten erfasst\" akzeptiert. Bei Wasser rechnest du Wasser- und Abwasserpreis zusammen.\n\nNach der Einrichtung wird im Hintergrund bis zu zwei Jahre Historie importiert.",
         "data": {
           "name": "Name",
           "meter_number": "Zählernummer",
           "unit": "Einheit",
           "obis_code": "OBIS-Code",
           "export_type": "Export-Typ",
-          "price": "Preis pro Einheit (optional)",
-          "price_winter": "Winterpreis, Oktober bis März (optional)"
+          "price": "Aktueller Preis pro Einheit (optional)"
         },
         "data_description": {
           "name": "Wird als Name der Statistik verwendet, z. B. Strom oder Wasser.",
@@ -45,8 +44,7 @@
           "unit": "Muss der Einheit entsprechen, die das Portal exportiert.",
           "obis_code": "1-1:1.29.0 belassen, solange das Portal keinen anderen Code verwendet.",
           "export_type": "WirkBezug belassen, solange das Portal keinen anderen Typ verwendet.",
-          "price": "Gilt ganzjährig, solange kein Winterpreis gesetzt ist.",
-          "price_winter": "Leer lassen, wenn der Preis das ganze Jahr gleich ist."
+          "price": "Bepreist auch die importierte Historie. Preisänderungen pro Monat trägst du danach unter Konfigurieren > Preise ein."
         }
       },
       "reauth_confirm": {
@@ -56,20 +54,40 @@
           "username": "Benutzername",
           "password": "Passwort"
         }
+      },
+      "reconfigure": {
+        "title": "Kundenportal-Konto",
+        "description": "Ändere Portal-Adresse, Konto oder Login-Details. Die Zähler und ihre Statistiken bleiben erhalten.",
+        "data": {
+          "base_url": "Portal-Adresse",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "login_url": "Login-Seite (optional)",
+          "username_field": "Formularfeld Benutzername (optional)",
+          "password_field": "Formularfeld Passwort (optional)"
+        },
+        "data_description": {
+          "base_url": "Für Kunden der Regio Energie Solothurn: https://okp.regioenergie.ch",
+          "username": "Auf okp.regioenergie.ch ist das die E-Mail-Adresse, mit der du dich anmeldest.",
+          "login_url": "Vollständige Adresse der Login-Seite, falls sie nicht automatisch gefunden wird.",
+          "username_field": "Name des Benutzername-Felds im Login-Formular.",
+          "password_field": "Name des Passwort-Felds im Login-Formular."
+        }
       }
     },
     "error": {
       "cannot_connect": "Das Portal ist nicht erreichbar.",
-      "invalid_auth": "Das Portal hat diese Zugangsdaten abgelehnt, oder das Login-Formular wurde nicht gefunden. Trage die erweiterten Login-Felder ein, um die Integration auf das richtige Formular zu lenken.",
-      "no_data": "Das Portal hat für diesen Zähler keine Messwerte geliefert. Prüfe Zählernummer, OBIS-Code und Export-Typ.",
+      "no_data": "Das Portal hat für diesen Zähler keine Werte geliefert. Prüfe Zählernummer, OBIS-Code und Export-Typ.",
       "required": "Dieses Feld ist erforderlich.",
       "invalid_unit": "Diese Einheit passt nicht zum gewählten Zählertyp.",
-      "price_required": "Ein Winterpreis braucht auch einen Grundpreis.",
-      "unknown": "Unerwarteter Fehler. Details stehen im Home-Assistant-Log."
+      "unknown": "Unerwarteter Fehler. Details stehen im Home-Assistant-Log.",
+      "invalid_auth": "Das Portal hat diese Zugangsdaten abgelehnt, oder das Login-Formular wurde nicht gefunden. Fülle die erweiterten Login-Felder aus, um auf das richtige Formular zu zeigen."
     },
     "abort": {
       "already_configured": "Dieses Konto ist bereits eingerichtet.",
-      "reauth_successful": "Anmeldung erfolgreich aktualisiert."
+      "reauth_successful": "Erneute Anmeldung erfolgreich.",
+      "reconfigure_successful": "Das Konto wurde aktualisiert.",
+      "unique_id_mismatch": "Das ist ein anderes Konto. Füge es als neuen Integrationseintrag hinzu."
     }
   },
   "options": {
@@ -79,28 +97,28 @@
         "menu_options": {
           "add_meter": "Zähler hinzufügen",
           "edit_meter": "Zähler bearbeiten",
+          "prices": "Preise",
           "remove_meter": "Zähler entfernen",
-          "settings": "Abruf- und Login-Einstellungen"
+          "settings": "Abfrage, Historie und Login"
         }
       },
       "meter_type": {
         "title": "Was misst der Zähler?",
-        "description": "Einheit und Preise auf dem nächsten Schritt richten sich danach. Strom und Wasser sind getestet, Gas und Fernwärme nicht - Rückmeldungen dazu sind willkommen.",
+        "description": "Einheit und Preis auf dem nächsten Schritt richten sich danach. Strom und Wasser sind getestet, Gas und Fernwärme nicht - Rückmeldungen dazu sind willkommen.",
         "data": {
           "meter_type": "Typ"
         }
       },
       "meter_details": {
         "title": "Zähler",
-        "description": "Preise sind optional und werden in {currency} pro {unit} angegeben. Trägst du einen ein, importiert die Integration zusätzlich eine Statistik mit den Kosten, die das Energy Dashboard als \"Statistik, die die Gesamtkosten erfasst\" akzeptiert.\n\nRegio Energie verrechnet Strom von April bis September günstiger und von Oktober bis März teurer - trag beide Preise ein. Bei Wasser genügt der erste Preis; rechne dafür Wasser- und Abwasserpreis zusammen, das ergibt den echten Preis pro m³.\n\nEin neuer Name lässt die bisherigen Statistiken unangetastet.",
+        "description": "Der Preis ist optional und wird in {currency} pro {unit} angegeben; Preise, die sich über die Zeit ändern, verwaltest du unter Preise. Bei einem neuen Zähler wird die Historie im Hintergrund importiert.\n\nUmbenennen behält die Statistiken. Die Einheit eines bestehenden Zählers lässt sich nicht ändern, weil seine Historie darin gespeichert ist.",
         "data": {
           "name": "Name",
           "meter_number": "Zählernummer",
           "unit": "Einheit",
           "obis_code": "OBIS-Code",
           "export_type": "Export-Typ",
-          "price": "Preis pro Einheit (optional)",
-          "price_winter": "Winterpreis, Oktober bis März (optional)"
+          "price": "Aktueller Preis pro Einheit (optional)"
         },
         "data_description": {
           "name": "Wird als Name der Statistik verwendet, z. B. Strom oder Wasser.",
@@ -108,8 +126,7 @@
           "unit": "Muss der Einheit entsprechen, die das Portal exportiert.",
           "obis_code": "1-1:1.29.0 belassen, solange das Portal keinen anderen Code verwendet.",
           "export_type": "WirkBezug belassen, solange das Portal keinen anderen Typ verwendet.",
-          "price": "Gilt ganzjährig, solange kein Winterpreis gesetzt ist.",
-          "price_winter": "Leer lassen, wenn der Preis das ganze Jahr gleich ist."
+          "price": "Bepreist auch die importierte Historie. Preisänderungen pro Monat trägst du danach unter Konfigurieren > Preise ein."
         }
       },
       "edit_meter": {
@@ -118,25 +135,64 @@
           "statistic_id": "Zähler"
         }
       },
+      "prices": {
+        "title": "Preise",
+        "description": "Wähle den Zähler, dessen Preise du ändern willst.",
+        "data": {
+          "statistic_id": "Zähler"
+        }
+      },
+      "price_menu": {
+        "title": "Preise von {meter}",
+        "description": "Jeder Preis gilt ab seinem Monat bis zum nächsten Eintrag. Monate vor dem ersten Eintrag erhalten den ersten Preis.\n\n{schedule}\n\nÄnderungen werden mit \"Speichern\" übernommen; danach werden die Kosten ab dem ersten geänderten Monat neu berechnet.",
+        "menu_options": {
+          "price_add": "Preis hinzufügen",
+          "price_remove": "Preise entfernen",
+          "price_save": "Speichern"
+        }
+      },
+      "price_add": {
+        "title": "Preis hinzufügen",
+        "description": "Preis in {unit_label}. Ein Eintrag im selben Monat wird ersetzt.",
+        "data": {
+          "valid_from": "Gültig ab",
+          "price": "Preis pro Einheit"
+        },
+        "data_description": {
+          "valid_from": "Nur der Monat zählt; der Preis gilt ab dem Ersten dieses Monats."
+        }
+      },
+      "price_remove": {
+        "title": "Preise entfernen",
+        "data": {
+          "entries": "Zu entfernende Einträge"
+        }
+      },
       "remove_meter": {
         "title": "Zähler entfernen",
-        "description": "Entfernte Zähler werden nicht mehr abgefragt. Ihre Statistiken bleiben in Home Assistant und lassen sich unter Entwicklerwerkzeuge > Statistiken löschen.",
+        "description": "Entfernte Zähler werden nicht mehr abgefragt.",
         "data": {
-          "meters": "Zu entfernende Zähler"
+          "meters": "Zu entfernende Zähler",
+          "delete_history": "Auch ihre Statistiken löschen"
+        },
+        "data_description": {
+          "delete_history": "Entfernt die Verbrauchs- und Kostenhistorie dieser Zähler aus Home Assistant. Das lässt sich nicht rückgängig machen."
         }
       },
       "settings": {
-        "title": "Abruf- und Login-Einstellungen",
+        "title": "Abfrage, Historie und Login",
         "data": {
-          "days_to_fetch": "Tage pro Abruf",
-          "scan_interval_hours": "Abrufintervall (Stunden)",
+          "scan_interval_minutes": "Abfrageintervall (Minuten)",
+          "days_to_fetch": "Tage für die tägliche Korrektur",
+          "history_days": "Historie neuer Zähler (Tage)",
           "login_url": "Login-Seite (optional)",
           "username_field": "Formularfeld Benutzername (optional)",
           "password_field": "Formularfeld Passwort (optional)"
         },
         "data_description": {
-          "days_to_fetch": "Wie weit jeder Abruf zurückliest. Die Überlappung übernimmt Werte, die der Versorger nachträglich korrigiert.",
-          "scan_interval_hours": "Das Portal veröffentlicht neue Daten üblicherweise einmal täglich.",
+          "scan_interval_minutes": "Das Portal veröffentlicht alle 15 Minuten neue Werte. Jede Abfrage liest die letzten zwei Tage.",
+          "days_to_fetch": "Einmal täglich werden so viele Tage neu gelesen, um nachträglich korrigierte Werte zu übernehmen.",
+          "history_days": "Wie weit zurück ein neu hinzugefügter Zähler importiert wird. 0 importiert keine Historie.",
           "login_url": "Vollständige Adresse der Login-Seite, falls sie nicht automatisch gefunden wird.",
           "username_field": "Name des Benutzername-Felds im Login-Formular.",
           "password_field": "Name des Passwort-Felds im Login-Formular."
@@ -145,12 +201,48 @@
     },
     "error": {
       "cannot_connect": "Das Portal ist nicht erreichbar.",
-      "invalid_auth": "Das Portal hat die gespeicherten Zugangsdaten abgelehnt, oder das Login-Formular wurde nicht gefunden.",
-      "no_data": "Das Portal hat für diesen Zähler keine Messwerte geliefert. Prüfe Zählernummer, OBIS-Code und Export-Typ.",
+      "no_data": "Das Portal hat für diesen Zähler keine Werte geliefert. Prüfe Zählernummer, OBIS-Code und Export-Typ.",
       "required": "Dieses Feld ist erforderlich.",
       "invalid_unit": "Diese Einheit passt nicht zum gewählten Zählertyp.",
-      "price_required": "Ein Winterpreis braucht auch einen Grundpreis.",
-      "unknown": "Unerwarteter Fehler. Details stehen im Home-Assistant-Log."
+      "unknown": "Unerwarteter Fehler. Details stehen im Home-Assistant-Log.",
+      "invalid_auth": "Das Portal hat die gespeicherten Zugangsdaten abgelehnt, oder das Login-Formular wurde nicht gefunden."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "price": {
+        "name": "{meter} Preis"
+      }
+    }
+  },
+  "issues": {
+    "meter_failed": {
+      "title": "Import von {name} schlägt wiederholt fehl",
+      "description": "Die letzten Abfragen konnten {name} nicht importieren: {error}\n\nPrüfe den Zähler in den Optionen der Integration. Diese Meldung verschwindet, sobald ein Import wieder gelingt."
+    }
+  },
+  "exceptions": {
+    "unknown_meter": {
+      "message": "Kein geladener Zähler hat die Statistik-ID {statistic_id}."
+    },
+    "backfill_running": {
+      "message": "Die Historie von {statistic_id} wird bereits importiert."
+    }
+  },
+  "services": {
+    "import_history": {
+      "name": "Historie importieren",
+      "description": "Importiert die Historie eines Zählers ab einem Startdatum bis heute, im Hintergrund.",
+      "fields": {
+        "statistic_id": {
+          "name": "Statistik-ID",
+          "description": "Die Verbrauchsstatistik des Zählers, z. B. regioenergie_import:strom_import."
+        },
+        "start": {
+          "name": "Start",
+          "description": "Erster Tag, der importiert wird."
+        }
+      }
     }
   },
   "selector": {
