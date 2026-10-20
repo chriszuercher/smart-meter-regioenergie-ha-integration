@@ -13,7 +13,7 @@
           "password_field": "Formularfeld Passwort (optional)"
         },
         "data_description": {
-          "base_url": "Für Kunden der Regio Energie Solothurn: https://okp.regioenergie.ch",
+          "base_url": "Für Kunden der Regio Energie Solothurn: {default_url}",
           "username": "Auf okp.regioenergie.ch ist das die E-Mail-Adresse, mit der du dich anmeldest.",
           "login_url": "Vollständige Adresse der Login-Seite, falls sie nicht automatisch gefunden wird.",
           "username_field": "Name des Benutzername-Felds im Login-Formular.",
@@ -67,7 +67,7 @@
           "password_field": "Formularfeld Passwort (optional)"
         },
         "data_description": {
-          "base_url": "Für Kunden der Regio Energie Solothurn: https://okp.regioenergie.ch",
+          "base_url": "Für Kunden der Regio Energie Solothurn: {default_url}",
           "username": "Auf okp.regioenergie.ch ist das die E-Mail-Adresse, mit der du dich anmeldest.",
           "login_url": "Vollständige Adresse der Login-Seite, falls sie nicht automatisch gefunden wird.",
           "username_field": "Name des Benutzername-Felds im Login-Formular.",

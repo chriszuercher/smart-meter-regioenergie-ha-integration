@@ -418,6 +418,7 @@ class RegioEnergieConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=_credentials_schema(user_input or {}),
             errors=errors,
+            description_placeholders={"default_url": DEFAULT_BASE_URL},
         )
 
     async def async_step_meter_type(
@@ -545,6 +546,7 @@ class RegioEnergieConfigFlow(ConfigFlow, domain=DOMAIN):
                 user_input or {**entry.data, **entry.options}
             ),
             errors=errors,
+            description_placeholders={"default_url": DEFAULT_BASE_URL},
         )
 
     @staticmethod
