@@ -60,6 +60,9 @@ dashboard reads. The only entities are the price sensors of priced meters
 Home Assistant 2025.2 or newer, and an account for the web portal of your
 utility.
 
+The integration icon is displayed by Home Assistant 2026.3 or newer. Older
+versions can still run the integration but do not load locally bundled icons.
+
 ## Installation
 
 ### HACS
