@@ -67,12 +67,11 @@ versions can still run the integration but do not load locally bundled icons.
 
 ## Installation
 
-### HACS
+### Marketplace / HACS
 
-Open the original repository in HACS (or the Home Assistant Marketplace on
-Home Assistant 2026.11 or newer):
+Open the original repository in the Home Assistant Marketplace:
 
-[![Open this repository in Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=cybersponge&repository=smart-meter-regioenergie-ha-integration&category=integration)
+[![Open this repository in the Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=cybersponge&repository=smart-meter-regioenergie-ha-integration&category=integration)
 
 Alternatively, add it manually:
 
