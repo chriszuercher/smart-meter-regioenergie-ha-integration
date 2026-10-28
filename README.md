@@ -1,5 +1,7 @@
 # Regio Energie Smart Meter Import
 
+![Regio Energie Smart Meter Import icon](custom_components/regioenergie_import/brand/icon.png)
+
 [![hacs][hacs-badge]][hacs-url]
 
 Home Assistant integration that imports smart meter load profiles from the
